@@ -25,32 +25,103 @@ export const Navigation: React.FC<NavigationProps> = ({ className = '' }) => {
     }
   };
 
+  const baseNavStyle: React.CSSProperties = {
+    backgroundColor: 'white',
+    borderTop: '1px solid #e5e7eb',
+    boxShadow: '0 -1px 3px 0 rgba(0, 0, 0, 0.1)',
+    padding: '0.5rem',
+    display: 'flex',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    minHeight: '70px',
+    position: 'relative'
+  };
+
+  const baseButtonStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0.5rem',
+    borderRadius: '0.5rem',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+    border: 'none',
+    backgroundColor: 'transparent',
+    minWidth: '60px',
+    gap: '0.25rem'
+  };
+
+  const activeButtonStyle: React.CSSProperties = {
+    ...baseButtonStyle,
+    color: '#2563eb',
+    backgroundColor: '#f0f9ff'
+  };
+
+  const inactiveButtonStyle: React.CSSProperties = {
+    ...baseButtonStyle,
+    color: '#6b7280'
+  };
+
+  const disabledButtonStyle: React.CSSProperties = {
+    ...baseButtonStyle,
+    color: '#9ca3af',
+    cursor: 'not-allowed',
+    opacity: 0.5
+  };
+
+  const iconStyle: React.CSSProperties = {
+    width: '1.5rem',
+    height: '1.5rem'
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: '0.75rem',
+    fontWeight: 500,
+    textAlign: 'center',
+    lineHeight: 1.2,
+    maxWidth: '60px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  };
+
   return (
-    <nav className={`bg-white border-t border-gray-200 shadow-lg ${className}`}>
-      <div className="flex justify-around items-center h-16 px-2">
-        {navigationItems.map((item) => {
-          const isActive = state.currentTab === item.id;
-          const IconComponent = isActive ? item.iconSolid : item.icon;
-          
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleTabClick(item.id, item.disabled)}
-              disabled={item.disabled}
-              className={`nav-item ${isActive ? 'active' : ''} ${
-                item.disabled ? 'opacity-50 cursor-not-allowed' : ''
-              } min-w-0 flex-1`}
-              aria-label={item.label}
-            >
-              <IconComponent className="h-6 w-6" />
-              <span className="text-xs font-medium truncate">{item.label}</span>
-              {item.disabled && (
-                <span className="text-xs text-gray-400">(Soon)</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+    <nav 
+      className={`bg-white border-t border-gray-200 shadow-lg ${className}`}
+      style={baseNavStyle}
+    >
+      {navigationItems.map((item) => {
+        const isActive = state.currentTab === item.id;
+        const IconComponent = isActive ? item.iconSolid : item.icon;
+        
+        const buttonStyle = item.disabled 
+          ? disabledButtonStyle
+          : isActive 
+            ? activeButtonStyle
+            : inactiveButtonStyle;
+        
+        return (
+          <button
+            key={item.id}
+            onClick={() => handleTabClick(item.id, item.disabled)}
+            disabled={item.disabled}
+            className={`nav-item ${isActive ? 'active' : ''} ${
+              item.disabled ? 'opacity-50 cursor-not-allowed' : ''
+            } min-w-0 flex-1`}
+            style={buttonStyle}
+            aria-label={item.label}
+          >
+            <IconComponent style={iconStyle} />
+            <span style={labelStyle}>{item.label}</span>
+            {item.disabled && (
+              <span style={{ fontSize: '0.625rem', color: '#9ca3af' }}>
+                (Soon)
+              </span>
+            )}
+          </button>
+        );
+      })}
     </nav>
   );
 };

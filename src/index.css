@@ -1,57 +1,140 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Leaflet CSS - Required for maps */
+/* Leaflet CSS - Must be imported first */
 @import "leaflet/dist/leaflet.css";
 
-/* Custom base styles */
-@layer base {
-  body {
-    @apply bg-gray-50 text-gray-900;
-  }
-  
-  * {
-    @apply box-border;
-  }
+/* Reset and base styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-/* Component styles */
-@layer components {
-  .mood-marker {
-    @apply rounded-full shadow-lg border-2 border-white transform transition-transform duration-200;
-  }
-  
-  .mood-marker:hover {
-    @apply scale-110 shadow-xl;
-  }
-  
-  .nav-item {
-    @apply flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors duration-200;
-  }
-  
-  .nav-item.active {
-    @apply text-primary-600 bg-primary-50;
-  }
-  
-  .nav-item:not(.active) {
-    @apply text-gray-500 hover:text-gray-700 hover:bg-gray-100;
-  }
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Map specific styles */
+body {
+  background-color: #f9fafb;
+  color: #111827;
+  line-height: 1.6;
+}
+
+/* Utility classes */
+.h-screen { height: 100vh; }
+.h-full { height: 100%; }
+.w-full { width: 100%; }
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-1 { flex: 1; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-around { justify-content: space-around; }
+.space-x-3 > * + * { margin-left: 0.75rem; }
+.space-y-1 > * + * { margin-top: 0.25rem; }
+.p-2 { padding: 0.5rem; }
+.p-4 { padding: 1rem; }
+.p-6 { padding: 1.5rem; }
+.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.ml-3 { margin-left: 0.75rem; }
+.mt-2 { margin-top: 0.5rem; }
+.rounded-lg { border-radius: 0.5rem; }
+.shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+.bg-white { background-color: white; }
+.bg-gray-50 { background-color: #f9fafb; }
+.bg-red-50 { background-color: #fef2f2; }
+.text-gray-700 { color: #374151; }
+.text-red-700 { color: #b91c1c; }
+.text-sm { font-size: 0.875rem; }
+.text-xs { font-size: 0.75rem; }
+.font-medium { font-weight: 500; }
+.border-t { border-top: 1px solid #e5e7eb; }
+.border-l-4 { border-left: 4px solid; }
+.border-red-500 { border-left-color: #ef4444; }
+.border-gray-200 { border-color: #e5e7eb; }
+.overflow-hidden { overflow: hidden; }
+.truncate { 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap; 
+}
+.min-w-0 { min-width: 0; }
+.opacity-50 { opacity: 0.5; }
+.cursor-not-allowed { cursor: not-allowed; }
+.fixed { position: fixed; }
+.absolute { position: absolute; }
+.relative { position: relative; }
+.inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+.top-4 { top: 1rem; }
+.left-4 { left: 1rem; }
+.right-4 { right: 1rem; }
+.z-50 { z-index: 50; }
+.z-10 { z-index: 10; }
+
+/* Primary colors */
+.text-primary-600 { color: #2563eb; }
+.bg-primary-50 { background-color: #f0f9ff; }
+.border-primary-600 { border-color: #2563eb; }
+
+/* Navigation styles */
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  min-width: 0;
+  flex: 1;
+}
+
+.nav-item:hover:not(.nav-item:disabled) {
+  color: #374151;
+  background-color: #f3f4f6;
+}
+
+.nav-item.active {
+  color: #2563eb;
+  background-color: #f0f9ff;
+}
+
+.nav-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Map styles */
 .leaflet-container {
-  @apply h-full w-full;
+  height: 100% !important;
+  width: 100% !important;
 }
 
-.mood-popup {
-  @apply bg-white rounded-lg shadow-lg p-4 border-0;
+.custom-mood-marker {
+  background: transparent !important;
+  border: none !important;
 }
 
-.mood-popup .leaflet-popup-content-wrapper {
-  @apply bg-transparent shadow-none;
+/* Animations */
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-.mood-popup .leaflet-popup-content {
-  @apply m-0;
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Background opacity */
+.bg-opacity-50 {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .text-xl { font-size: 1.125rem; }
+  .text-lg { font-size: 1rem; }
 }

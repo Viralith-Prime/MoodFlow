@@ -13,7 +13,7 @@ const createMoodMarker = (mood: MoodEntry): DivIcon => {
   
   return new DivIcon({
     html: `
-      <div class="mood-marker" style="
+      <div style="
         background-color: ${color};
         width: 40px;
         height: 40px;
@@ -22,6 +22,11 @@ const createMoodMarker = (mood: MoodEntry): DivIcon => {
         justify-content: center;
         font-size: 18px;
         opacity: ${0.6 + (mood.intensity * 0.1)};
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transform: scale(1);
+        transition: transform 0.2s ease;
       ">
         ${mood.emoji}
       </div>
@@ -84,18 +89,74 @@ export const MoodMap: React.FC<MoodMapProps> = ({ className = '' }) => {
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
   };
 
+  const headerStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '1rem',
+    left: '1rem',
+    right: '1rem',
+    zIndex: 1000,
+    pointerEvents: 'none'
+  };
+
+  const headerCardStyle: React.CSSProperties = {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(10px)',
+    borderRadius: '0.75rem',
+    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+    padding: '1.5rem',
+    pointerEvents: 'auto'
+  };
+
+  const titleStyle: React.CSSProperties = {
+    fontSize: '1.5rem',
+    fontWeight: 'bold',
+    color: '#111827',
+    margin: '0 0 0.25rem 0'
+  };
+
+  const subtitleStyle: React.CSSProperties = {
+    fontSize: '0.875rem',
+    color: '#6b7280',
+    margin: '0 0 0.75rem 0'
+  };
+
+  const statsStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+    fontSize: '0.75rem',
+    color: '#6b7280'
+  };
+
+  const errorStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '1rem',
+    left: '1rem',
+    right: '1rem',
+    zIndex: 1000,
+    backgroundColor: '#fef3c7',
+    border: '1px solid #f59e0b',
+    borderRadius: '0.5rem',
+    padding: '0.75rem'
+  };
+
   return (
-    <div className={`relative h-full w-full ${className}`}>
+    <div 
+      className={`relative h-full w-full ${className}`}
+      style={{ position: 'relative', height: '100%', width: '100%' }}
+    >
       {locationError && (
-        <div className="absolute top-4 left-4 right-4 z-10 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <p className="text-sm text-yellow-800">{locationError}</p>
+        <div style={errorStyle}>
+          <p style={{ color: '#92400e', fontSize: '0.875rem', margin: 0 }}>
+            {locationError}
+          </p>
         </div>
       )}
       
       <MapContainer
         center={userLocation}
         zoom={13}
-        className="h-full w-full"
+        style={{ height: '100%', width: '100%' }}
         zoomControl={true}
         scrollWheelZoom={true}
       >
@@ -115,26 +176,30 @@ export const MoodMap: React.FC<MoodMapProps> = ({ className = '' }) => {
               position={[mood.location.lat, mood.location.lng]}
               icon={createMoodMarker(mood)}
             >
-              <Popup className="mood-popup">
-                <div className="p-2 min-w-48">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <span className="text-2xl">{mood.emoji}</span>
+              <Popup>
+                <div style={{ padding: '0.5rem', minWidth: '200px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '2rem' }}>{mood.emoji}</span>
                     <div>
-                      <h3 className="font-semibold text-gray-900">{mood.name}</h3>
-                      <p className="text-sm text-gray-500">
+                      <h3 style={{ fontWeight: 600, color: '#111827', margin: 0 }}>{mood.name}</h3>
+                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
                         Intensity: {mood.intensity}/5
                       </p>
                     </div>
                   </div>
                   
                   {mood.notes && (
-                    <p className="text-sm text-gray-700 mb-2">{mood.notes}</p>
+                    <p style={{ fontSize: '0.875rem', color: '#374151', marginBottom: '0.5rem' }}>
+                      {mood.notes}
+                    </p>
                   )}
                   
-                  <div className="flex justify-between items-center text-xs text-gray-500">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#6b7280' }}>
                     <span>{formatTimeAgo(mood.timestamp)}</span>
                     {mood.location.address && (
-                      <span className="truncate ml-2">{mood.location.address}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>
+                        {mood.location.address}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -144,20 +209,26 @@ export const MoodMap: React.FC<MoodMapProps> = ({ className = '' }) => {
       </MapContainer>
       
       {/* Map overlay with app info */}
-      <div className="absolute top-4 left-4 right-4 z-10 pointer-events-none">
-        <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4 pointer-events-auto">
-          <h1 className="text-xl font-bold text-gray-900 mb-1">
-            MoodFlow
+      <div style={headerStyle}>
+        <div style={headerCardStyle}>
+          <h1 style={titleStyle}>
+            🌊 MoodFlow
           </h1>
-          <p className="text-sm text-gray-600">
+          <p style={subtitleStyle}>
             Discover real-time emotions around you and track your mood patterns
           </p>
           
           {state.moods.length > 0 && (
-            <div className="mt-2 flex items-center space-x-4 text-xs text-gray-500">
+            <div style={statsStyle}>
               <span>{state.moods.length} mood{state.moods.length !== 1 ? 's' : ''} logged</span>
               <span>•</span>
               <span>Tap markers to explore</span>
+            </div>
+          )}
+          
+          {state.moods.length === 0 && (
+            <div style={statsStyle}>
+              <span>🎯 Welcome! Tap "Log Mood" to add your first mood</span>
             </div>
           )}
         </div>
