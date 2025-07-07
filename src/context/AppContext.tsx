@@ -2,7 +2,6 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppState, MoodEntry, UserSettings, NavigationTab } from '../types';
-import { DEFAULT_LOCATION } from '../constants/moods';
 
 interface AppContextType {
   state: AppState;
