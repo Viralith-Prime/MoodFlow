@@ -43,31 +43,31 @@ class LazyErrorBoundary extends React.Component<
 
 // Lazy loaded components with chunk names for better debugging
 const LazyMap = lazy(() => 
-  import('../components/MoodMap').then(module => ({ 
+  import('./MoodMap').then(module => ({ 
     default: module.MoodMap 
   }))
 );
 
 const LazyAnalytics = lazy(() => 
-  import('../components/pages/Analytics').then(module => ({ 
+  import('./pages/Analytics').then(module => ({ 
     default: module.Analytics 
   }))
 );
 
 const LazyMoodLogging = lazy(() => 
-  import('../components/pages/MoodLogging').then(module => ({ 
+  import('./pages/MoodLogging').then(module => ({ 
     default: module.MoodLogging 
   }))
 );
 
 const LazySettings = lazy(() => 
-  import('../components/pages/Settings').then(module => ({ 
+  import('./pages/Settings').then(module => ({ 
     default: module.Settings 
   }))
 );
 
 const LazyCommunity = lazy(() => 
-  import('../components/pages/Community').then(module => ({ 
+  import('./pages/Community').then(module => ({ 
     default: module.Community 
   }))
 );
@@ -179,22 +179,26 @@ export const OptimizedCommunity: React.FC = () => {
 
 // Preload components for high-performance devices
 export const preloadComponents = () => {
-  const config = useOptimizedConfig();
-  
-  if (config.performanceConfig.enablePrefetching) {
-    // Preload critical components
-    Promise.all([
-      import('../components/MoodMap'),
-      import('../components/pages/MoodLogging'),
-    ]).catch(err => console.warn('Component preload failed:', err));
+  try {
+    const config = useOptimizedConfig();
     
-    // Preload secondary components after a delay
-    setTimeout(() => {
+    if (config.performanceConfig.enablePrefetching) {
+      // Preload critical components
       Promise.all([
-        import('../components/pages/Analytics'),
-        import('../components/pages/Settings'),
-        import('../components/pages/Community'),
-      ]).catch(err => console.warn('Secondary component preload failed:', err));
-    }, 2000);
+        import('./MoodMap'),
+        import('./pages/MoodLogging'),
+      ]).catch(err => console.warn('Component preload failed:', err));
+      
+      // Preload secondary components after a delay
+      setTimeout(() => {
+        Promise.all([
+          import('./pages/Analytics'),
+          import('./pages/Settings'),
+          import('./pages/Community'),
+        ]).catch(err => console.warn('Secondary component preload failed:', err));
+      }, 2000);
+    }
+  } catch (error) {
+    console.warn('Preload setup failed:', error);
   }
 };

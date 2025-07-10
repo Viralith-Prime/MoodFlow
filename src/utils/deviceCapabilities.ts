@@ -27,20 +27,45 @@ class DeviceCapabilityDetector {
       return this.capabilities;
     }
 
-    this.capabilities = {
-      hasGeolocation: this.checkGeolocation(),
-      hasLocalStorage: this.checkLocalStorage(),
-      hasIndexedDB: this.checkIndexedDB(),
-      hasWebGL: this.checkWebGL(),
-      hasCanvas: this.checkCanvas(),
-      isTouchDevice: this.checkTouchDevice(),
-      isLowEndDevice: this.checkLowEndDevice(),
-      hasServiceWorker: this.checkServiceWorker(),
-      connectionType: this.getConnectionType(),
-      memoryLevel: this.getMemoryLevel(),
-      performanceLevel: this.getPerformanceLevel(),
-      browserSupport: this.checkBrowserSupport(),
-    };
+    try {
+      this.capabilities = {
+        hasGeolocation: this.checkGeolocation(),
+        hasLocalStorage: this.checkLocalStorage(),
+        hasIndexedDB: this.checkIndexedDB(),
+        hasWebGL: this.checkWebGL(),
+        hasCanvas: this.checkCanvas(),
+        isTouchDevice: this.checkTouchDevice(),
+        isLowEndDevice: this.checkLowEndDevice(),
+        hasServiceWorker: this.checkServiceWorker(),
+        connectionType: this.getConnectionType(),
+        memoryLevel: this.getMemoryLevel(),
+        performanceLevel: this.getPerformanceLevel(),
+        browserSupport: this.checkBrowserSupport(),
+      };
+    } catch (error) {
+      console.warn('Device capabilities detection failed, using defaults:', error);
+      // Fallback to safe defaults
+      this.capabilities = {
+        hasGeolocation: false,
+        hasLocalStorage: true,
+        hasIndexedDB: false,
+        hasWebGL: false,
+        hasCanvas: true,
+        isTouchDevice: false,
+        isLowEndDevice: false,
+        hasServiceWorker: false,
+        connectionType: 'unknown',
+        memoryLevel: 'medium',
+        performanceLevel: 'medium',
+        browserSupport: {
+          modernJS: true,
+          flexbox: true,
+          grid: true,
+          webp: false,
+          avif: false,
+        },
+      };
+    }
 
     return this.capabilities;
   }
@@ -160,16 +185,26 @@ class DeviceCapabilityDetector {
   }
 
   private checkBrowserSupport() {
-    const testDiv = document.createElement('div');
-    testDiv.style.display = 'flex';
-    
-    return {
-      modernJS: this.checkModernJS(),
-      flexbox: testDiv.style.display === 'flex',
-      grid: CSS.supports('display', 'grid'),
-      webp: this.checkWebPSupport(),
-      avif: this.checkAVIFSupport(),
-    };
+    try {
+      const testDiv = document.createElement('div');
+      testDiv.style.display = 'flex';
+      
+      return {
+        modernJS: this.checkModernJS(),
+        flexbox: testDiv.style.display === 'flex',
+        grid: typeof CSS !== 'undefined' && CSS.supports ? CSS.supports('display', 'grid') : false,
+        webp: this.checkWebPSupport(),
+        avif: this.checkAVIFSupport(),
+      };
+    } catch (error) {
+      return {
+        modernJS: true,
+        flexbox: true,
+        grid: true,
+        webp: false,
+        avif: false,
+      };
+    }
   }
 
   private checkModernJS(): boolean {
