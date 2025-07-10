@@ -2,12 +2,15 @@
 
 ## 🚀 Full-Stack Architecture
 
-MoodFlow is now a complete full-stack application with:
+MoodFlow is now a complete enterprise-grade full-stack application with:
 - **Frontend**: React 18 + TypeScript + Vite (built by cursor agent)
 - **Backend**: Vercel Edge Functions + KV Storage (zero-cost)
 - **Database**: Vercel KV (Redis-based, free tier)
+- **Authentication**: JWT-based auth with password hashing
+- **Security**: Enterprise-grade security with rate limiting
 - **Deployment**: Vercel (free hosting)
 - **Offline Support**: Progressive Web App with localStorage fallback
+- **Account System**: Optional accounts with data migration
 
 ## 📋 Prerequisites
 
@@ -43,8 +46,12 @@ MoodFlow is now a complete full-stack application with:
 ### Step 3: Configure Environment Variables
 ```bash
 # In Vercel Dashboard > Settings > Environment Variables:
-# These will be auto-populated after creating KV database:
 
+# REQUIRED: JWT Secret for authentication
+# Generate secure key: openssl rand -base64 32
+JWT_SECRET=your-secure-jwt-secret-here
+
+# Auto-populated after creating KV database:
 KV_REST_API_URL=https://...
 KV_REST_API_TOKEN=...
 KV_REST_API_READ_ONLY_TOKEN=...
@@ -52,6 +59,7 @@ KV_REST_API_READ_ONLY_TOKEN=...
 # Optional (app works without these):
 VITE_APP_NAME=MoodFlow
 VITE_APP_VERSION=1.0.0
+NODE_ENV=production
 ```
 
 ### Step 4: Redeploy
@@ -109,14 +117,31 @@ npm run preview
 ```
 
 ### API Endpoints
-```
-GET    /api/moods?userId=xxx     # Get user's moods
-POST   /api/moods?userId=xxx     # Create new mood
-PUT    /api/moods?userId=xxx&id=xxx # Update mood
-DELETE /api/moods?userId=xxx&id=xxx # Delete mood
 
-GET    /api/settings?userId=xxx  # Get user settings
-PUT    /api/settings?userId=xxx  # Update settings
+**Authentication API:**
+```
+POST   /api/auth/register        # Create new account
+POST   /api/auth/login           # Sign in to account
+POST   /api/auth/logout          # Sign out
+GET    /api/auth/verify          # Verify JWT token
+GET    /api/auth/profile         # Get user profile
+PUT    /api/auth/profile         # Update profile
+DELETE /api/auth/delete-account  # Delete account
+```
+
+**Data API (supports both anonymous and authenticated users):**
+```
+GET    /api/moods                # Get user's moods (auth via JWT)
+POST   /api/moods                # Create new mood
+PUT    /api/moods?id=xxx         # Update mood
+DELETE /api/moods?id=xxx         # Delete mood
+
+GET    /api/settings             # Get user settings
+PUT    /api/settings             # Update settings
+
+# Legacy anonymous support:
+GET    /api/moods?userId=xxx     # Get moods (anonymous)
+POST   /api/moods?userId=xxx     # Create mood (anonymous)
 ```
 
 ## 📊 Features & Capabilities
@@ -126,9 +151,13 @@ PUT    /api/settings?userId=xxx  # Update settings
 - **Mood Logging** with emoji picker and intensity slider
 - **Analytics Dashboard** with charts and insights
 - **Settings Management** with privacy controls
+- **Account System** with JWT authentication
+- **User Registration & Login** with enterprise security
+- **Data Migration** from anonymous to authenticated
 - **Offline Support** with automatic sync
 - **Mobile-Responsive** design
-- **Data Persistence** with cloud backup
+- **Cloud Data Storage** with cross-device sync
+- **Enterprise Security** with password hashing & rate limiting
 
 ### 🔄 Data Synchronization
 - **Offline-First**: All actions work offline

@@ -13,7 +13,7 @@ const navigationItems = [
   { id: 'log' as NavigationTab, label: 'Log Mood', icon: PlusIcon, iconSolid: PlusIconSolid },
   { id: 'analytics' as NavigationTab, label: 'Analytics', icon: ChartBarIcon, iconSolid: ChartBarIconSolid },
   { id: 'settings' as NavigationTab, label: 'Settings', icon: Cog6ToothIcon, iconSolid: Cog6ToothIconSolid },
-  { id: 'community' as NavigationTab, label: 'Community', icon: UserGroupIcon, iconSolid: UserGroupIconSolid, disabled: true },
+  { id: 'community' as NavigationTab, label: 'Community', icon: UserGroupIcon, iconSolid: UserGroupIconSolid },
 ];
 
 export const Navigation: React.FC<NavigationProps> = ({ className = '' }) => {
@@ -95,7 +95,7 @@ export const Navigation: React.FC<NavigationProps> = ({ className = '' }) => {
         const isActive = state.currentTab === item.id;
         const IconComponent = isActive ? item.iconSolid : item.icon;
         
-        const buttonStyle = item.disabled 
+        const buttonStyle = (item as any).disabled 
           ? disabledButtonStyle
           : isActive 
             ? activeButtonStyle
@@ -104,17 +104,17 @@ export const Navigation: React.FC<NavigationProps> = ({ className = '' }) => {
         return (
           <button
             key={item.id}
-            onClick={() => handleTabClick(item.id, item.disabled)}
-            disabled={item.disabled}
+            onClick={() => handleTabClick(item.id, (item as any).disabled)}
+            disabled={(item as any).disabled}
             className={`nav-item ${isActive ? 'active' : ''} ${
-              item.disabled ? 'opacity-50 cursor-not-allowed' : ''
+              (item as any).disabled ? 'opacity-50 cursor-not-allowed' : ''
             } min-w-0 flex-1`}
             style={buttonStyle}
             aria-label={item.label}
           >
             <IconComponent style={iconStyle} />
             <span style={labelStyle}>{item.label}</span>
-            {item.disabled && (
+            {(item as any).disabled && (
               <span style={{ fontSize: '0.625rem', color: '#9ca3af' }}>
                 (Soon)
               </span>

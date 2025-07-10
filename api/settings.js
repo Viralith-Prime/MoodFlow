@@ -1,12 +1,52 @@
 import { kv } from '@vercel/kv';
 import { NextResponse } from 'next/server';
+import { jwtVerify } from 'jose';
 
 export const runtime = 'edge';
 
+// JWT Configuration
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production'
+);
+
+async function getUserFromRequest(req) {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Return anonymous user ID from query params or default
+    const url = new URL(req.url);
+    return { 
+      id: url.searchParams.get('userId') || 'anonymous',
+      isAuthenticated: false 
+    };
+  }
+
+  try {
+    const token = authHeader.slice(7);
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    
+    if (payload && payload.userId) {
+      return { 
+        id: payload.userId,
+        username: payload.username,
+        email: payload.email,
+        isAuthenticated: true 
+      };
+    }
+  } catch (error) {
+    console.warn('Invalid JWT token:', error.message);
+  }
+
+  // Fallback to anonymous
+  const url = new URL(req.url);
+  return { 
+    id: url.searchParams.get('userId') || 'anonymous',
+    isAuthenticated: false 
+  };
+}
+
 export default async function handler(req) {
   const { method } = req;
-  const url = new URL(req.url);
-  const userId = url.searchParams.get('userId') || 'anonymous';
+  const user = await getUserFromRequest(req);
 
   // CORS headers
   const corsHeaders = {
@@ -22,11 +62,11 @@ export default async function handler(req) {
   try {
     switch (method) {
       case 'GET':
-        return await getSettings(userId, corsHeaders);
+        return await getSettings(user, corsHeaders);
       
       case 'PUT':
         const settingsData = await req.json();
-        return await updateSettings(userId, settingsData, corsHeaders);
+        return await updateSettings(user, settingsData, corsHeaders);
       
       default:
         return new NextResponse(
@@ -43,11 +83,29 @@ export default async function handler(req) {
   }
 }
 
-async function getSettings(userId, corsHeaders) {
+async function getSettings(user, corsHeaders) {
   try {
-    const settings = await kv.get(`settings:${userId}`) || {};
+    const settings = await kv.get(`settings:${user.id}`) || {};
+    
+    // Add account info for authenticated users
+    if (user.isAuthenticated) {
+      settings.account = {
+        username: user.username,
+        email: user.email
+      };
+    }
+    
+    const response = {
+      settings,
+      user: user.isAuthenticated ? {
+        id: user.id,
+        username: user.username,
+        email: user.email
+      } : null
+    };
+    
     return new NextResponse(
-      JSON.stringify({ settings }),
+      JSON.stringify(response),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
@@ -55,15 +113,36 @@ async function getSettings(userId, corsHeaders) {
   }
 }
 
-async function updateSettings(userId, settingsData, corsHeaders) {
+async function updateSettings(user, settingsData, corsHeaders) {
   try {
-    const existingSettings = await kv.get(`settings:${userId}`) || {};
-    const updatedSettings = { ...existingSettings, ...settingsData };
+    const existingSettings = await kv.get(`settings:${user.id}`) || {};
     
-    await kv.set(`settings:${userId}`, updatedSettings, { ex: 60 * 60 * 24 * 365 }); // 1 year expiry
+    // Don't allow account updates through settings API (use auth API instead)
+    const { account, ...safeSettingsData } = settingsData;
+    
+    const updatedSettings = { 
+      ...existingSettings, 
+      ...safeSettingsData,
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Add account info for authenticated users
+    if (user.isAuthenticated) {
+      updatedSettings.account = {
+        username: user.username,
+        email: user.email
+      };
+    }
+    
+    // Longer expiry for authenticated users
+    const expiry = user.isAuthenticated ? (60 * 60 * 24 * 365 * 2) : (60 * 60 * 24 * 365);
+    await kv.set(`settings:${user.id}`, updatedSettings, { ex: expiry });
     
     return new NextResponse(
-      JSON.stringify({ settings: updatedSettings }),
+      JSON.stringify({ 
+        settings: updatedSettings,
+        message: 'Settings updated successfully'
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

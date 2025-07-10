@@ -17,6 +17,42 @@ export interface MoodEntry extends Mood {
   isPublic: boolean;
 }
 
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  createdAt: string;
+  updatedAt: string;
+  isVerified: boolean;
+  lastLogin: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error?: string;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface RegisterCredentials {
+  username: string;
+  email: string;
+  password: string;
+}
+
+export interface UpdateProfileData {
+  username?: string;
+  email?: string;
+  currentPassword?: string;
+  newPassword?: string;
+}
+
 export interface UserSettings {
   notifications: {
     enabled: boolean;
@@ -38,6 +74,7 @@ export interface UserSettings {
     username?: string;
     email?: string;
   };
+  updatedAt?: string;
 }
 
 export interface MoodStats {
@@ -80,6 +117,7 @@ export interface AppState {
   currentTab: NavigationTab;
   isLoading: boolean;
   error?: string;
+  auth: AuthState;
   syncStatus?: {
     isOffline: boolean;
     pendingSyncCount: number;

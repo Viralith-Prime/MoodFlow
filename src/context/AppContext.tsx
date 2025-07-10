@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppState, MoodEntry, UserSettings, NavigationTab } from '../types';
+import type { AppState, MoodEntry, UserSettings, NavigationTab, AuthState, User } from '../types';
 import { apiService } from '../services/api';
+import { authService } from '../services/authService';
 
 interface AppContextType {
   state: AppState;
@@ -17,6 +18,9 @@ interface AppContextType {
     lastSyncTime?: Date;
   };
   forceSync: () => Promise<void>;
+  // Authentication methods
+  setAuthState: (authState: AuthState) => void;
+  updateUser: (user: User | null) => void;
 }
 
 type AppAction =
@@ -27,7 +31,9 @@ type AppAction =
   | { type: 'SET_ERROR'; payload: string }
   | { type: 'CLEAR_ERROR' }
   | { type: 'LOAD_DATA'; payload: { moods: MoodEntry[]; settings: UserSettings } }
-  | { type: 'UPDATE_SYNC_STATUS'; payload: { isOffline: boolean; pendingSyncCount: number; lastSyncTime?: Date } };
+  | { type: 'UPDATE_SYNC_STATUS'; payload: { isOffline: boolean; pendingSyncCount: number; lastSyncTime?: Date } }
+  | { type: 'SET_AUTH_STATE'; payload: AuthState }
+  | { type: 'UPDATE_USER'; payload: User | null };
 
 const defaultSettings: UserSettings = {
   notifications: {
@@ -54,6 +60,12 @@ const initialState: AppState = {
   userSettings: defaultSettings,
   currentTab: 'home',
   isLoading: false,
+  auth: {
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    isLoading: false,
+  },
 };
 
 const appReducer = (state: AppState, action: AppAction): AppState => {
@@ -101,6 +113,20 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
         ...state,
         syncStatus: action.payload,
       };
+    case 'SET_AUTH_STATE':
+      return {
+        ...state,
+        auth: action.payload,
+      };
+    case 'UPDATE_USER':
+      return {
+        ...state,
+        auth: {
+          ...state.auth,
+          user: action.payload,
+          isAuthenticated: !!action.payload,
+        },
+      };
     default:
       return state;
   }
@@ -126,6 +152,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     syncStatus: {
       isOffline: apiService.isOffline(),
       pendingSyncCount: apiService.getPendingSyncCount(),
+    },
+    auth: {
+      user: authService.getUser(),
+      token: authService.getToken(),
+      isAuthenticated: authService.isAuthenticated(),
+      isLoading: false,
     }
   });
 
@@ -329,6 +361,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
+  const setAuthState = (authState: AuthState) => {
+    dispatch({ type: 'SET_AUTH_STATE', payload: authState });
+  };
+
+  const updateUser = (user: User | null) => {
+    dispatch({ type: 'UPDATE_USER', payload: user });
+  };
+
   const value: AppContextType = {
     state,
     addMood,
@@ -341,6 +381,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       pendingSyncCount: 0,
     },
     forceSync,
+    setAuthState,
+    updateUser,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
