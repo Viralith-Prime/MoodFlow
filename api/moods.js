@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
-import { getStorageEngine } from './storage/CustomStorageEngine.js';
+import { storage } from './storage/index.js';
 
 export const runtime = 'edge';
-
-// Get custom storage instance
-const storage = getStorageEngine();
 
 // JWT Configuration
 const JWT_SECRET = new TextEncoder().encode(

@@ -3,12 +3,9 @@ import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { z } from 'zod';
 import validator from 'validator';
-import { getStorageEngine } from './storage/CustomStorageEngine.js';
+import { storage } from './storage/index.js';
 
 export const runtime = 'edge';
-
-// Get custom storage instance
-const storage = getStorageEngine();
 
 // JWT Configuration
 const JWT_SECRET = new TextEncoder().encode(
