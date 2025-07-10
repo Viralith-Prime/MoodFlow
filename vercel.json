@@ -118,7 +118,7 @@
   ],
   "env": {
     "NODE_ENV": "production",
-    "JWT_SECRET": "@jwt_secret"
+    "AUTH_SECRET_KEY": "@auth_secret_key"
   },
   "regions": ["iad1"]
 }

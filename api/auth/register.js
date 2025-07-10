@@ -1,6 +1,6 @@
-import { storage } from '../storage/index.js';
+import { storageAdapter } from '../storage/StorageAdapter.js';
+import { authEngine } from './CustomAuthEngine.js';
 import bcrypt from 'bcryptjs';
-import { SignJWT } from 'jose';
 import { z } from 'zod';
 import validator from 'validator';
 
