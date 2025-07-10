@@ -4,12 +4,6 @@
   "outputDirectory": "dist",
   "installCommand": "npm install --force",
   "framework": "vite",
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs18.x",
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
     {
       "source": "/api/auth/register",
