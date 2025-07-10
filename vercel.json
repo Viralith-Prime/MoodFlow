@@ -4,6 +4,23 @@
   "outputDirectory": "dist",
   "installCommand": "npm install --force",
   "framework": "vite",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "runtime": "nodejs18.x",
+        "maxDuration": 30
+      }
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/auth/register",
@@ -28,10 +45,6 @@
     {
       "source": "/api/settings",
       "destination": "/api/settings/index.js"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
     },
     {
       "source": "/(.*)",
@@ -83,51 +96,17 @@
         {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
         }
       ]
     }
   ],
-  "routes": [
-    {
-      "src": "/api/auth/register",
-      "dest": "/api/auth/register.js"
-    },
-    {
-      "src": "/api/auth/login",
-      "dest": "/api/auth/login.js"
-    },
-    {
-      "src": "/api/auth/verify",
-      "dest": "/api/auth/verify.js"
-    },
-    {
-      "src": "/api/auth/profile",
-      "dest": "/api/auth/profile.js"
-    },
-    {
-      "src": "/api/moods",
-      "dest": "/api/moods/index.js"
-    },
-    {
-      "src": "/api/settings",
-      "dest": "/api/settings/index.js"
-    }
-  ],
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "JWT_SECRET": "@jwt_secret"
   },
-  "regions": ["iad1"],
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
-    }
-  ]
+  "regions": ["iad1"]
 }
