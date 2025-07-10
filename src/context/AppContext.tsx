@@ -161,65 +161,55 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   });
 
-  // Load data from API/localStorage on mount
+  // Load data from localStorage first, then try API sync
   useEffect(() => {
     const loadInitialData = async () => {
       dispatch({ type: 'SET_LOADING', payload: true });
       
       try {
-        // Load moods and settings in parallel
-        const [moodsResponse, settingsResponse] = await Promise.all([
-          apiService.getMoods(),
-          apiService.getSettings()
-        ]);
-
-        const moods = moodsResponse.data || [];
-        const settings = { ...defaultSettings, ...settingsResponse.data };
-
-        // If there's no server data but we have localStorage data, use localStorage
-        if (moods.length === 0) {
-          const localMoods = localStorage.getItem('moodflow-moods');
-          if (localMoods) {
-            const parsedMoods = JSON.parse(localMoods).map((mood: any) => ({
-              ...mood,
-              timestamp: new Date(mood.timestamp),
-            }));
-            dispatch({ type: 'LOAD_DATA', payload: { moods: parsedMoods, settings } });
-          } else {
-            dispatch({ type: 'LOAD_DATA', payload: { moods: [], settings } });
-          }
-        } else {
-          dispatch({ type: 'LOAD_DATA', payload: { moods, settings } });
-        }
-
-        // Show warning if using offline data
-        if (!moodsResponse.success || !settingsResponse.success) {
-          dispatch({ type: 'SET_ERROR', payload: 'Working offline - data will sync when connected' });
-          setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 5000);
-        }
-
-      } catch (error) {
-        console.error('Error loading initial data:', error);
+        // Always load from localStorage first for instant app start
+        const savedMoods = localStorage.getItem('moodflow-moods');
+        const savedSettings = localStorage.getItem('moodflow-settings');
         
-        // Fallback to localStorage only
-        try {
-          const savedMoods = localStorage.getItem('moodflow-moods');
-          const savedSettings = localStorage.getItem('moodflow-settings');
-          
-          const moods = savedMoods ? JSON.parse(savedMoods).map((mood: any) => ({
-            ...mood,
-            timestamp: new Date(mood.timestamp),
-          })) : [];
-          
-          const settings = savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
-          
-          dispatch({ type: 'LOAD_DATA', payload: { moods, settings } });
-          dispatch({ type: 'SET_ERROR', payload: 'Working offline - data will sync when connected' });
-          setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 5000);
-        } catch (localError) {
-          console.error('Error loading from localStorage:', localError);
-          dispatch({ type: 'SET_ERROR', payload: 'Failed to load data' });
-        }
+        const localMoods = savedMoods ? JSON.parse(savedMoods).map((mood: any) => ({
+          ...mood,
+          timestamp: new Date(mood.timestamp),
+        })) : [];
+        
+        const localSettings = savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
+        
+        // Load local data immediately
+        dispatch({ type: 'LOAD_DATA', payload: { moods: localMoods, settings: localSettings } });
+        
+        // Try to sync with API in background (non-blocking)
+        setTimeout(async () => {
+          try {
+            const [moodsResponse, settingsResponse] = await Promise.all([
+              apiService.getMoods(),
+              apiService.getSettings()
+            ]);
+
+            // Only update if API has newer data
+            if (moodsResponse.success && moodsResponse.data && moodsResponse.data.length > 0) {
+              const serverMoods = moodsResponse.data.map((mood: any) => ({
+                ...mood,
+                timestamp: new Date(mood.timestamp),
+              }));
+              dispatch({ type: 'LOAD_DATA', payload: { 
+                moods: serverMoods, 
+                settings: settingsResponse.success ? { ...defaultSettings, ...settingsResponse.data } : localSettings 
+              }});
+            }
+          } catch (apiError) {
+            console.log('API sync failed, using local data:', apiError);
+            // This is fine - we already have local data loaded
+          }
+        }, 100);
+
+      } catch (localError) {
+        console.error('Error loading from localStorage:', localError);
+        // If even localStorage fails, load with defaults
+        dispatch({ type: 'LOAD_DATA', payload: { moods: [], settings: defaultSettings } });
       }
     };
 
@@ -276,7 +266,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Error adding mood:', error);
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to add mood' });
+      // Still add locally even if API fails
+      const localMood: MoodEntry = {
+        id: uuidv4(),
+        ...moodData,
+        timestamp: new Date(),
+      };
+      dispatch({ type: 'ADD_MOOD', payload: localMood });
+      dispatch({ type: 'SET_ERROR', payload: 'Mood saved locally' });
+      setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 3000);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -305,7 +303,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Error updating settings:', error);
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to update settings' });
+      // Still update locally even if API fails
+      dispatch({ type: 'UPDATE_SETTINGS', payload: settings });
+      dispatch({ type: 'SET_ERROR', payload: 'Settings saved locally' });
+      setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 3000);
     }
   };
 

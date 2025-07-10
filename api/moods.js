@@ -1,8 +1,11 @@
-import { kv } from '@vercel/kv';
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
+import { getStorageEngine } from './storage/CustomStorageEngine.js';
 
 export const runtime = 'edge';
+
+// Get custom storage instance
+const storage = getStorageEngine();
 
 // JWT Configuration
 const JWT_SECRET = new TextEncoder().encode(
@@ -96,7 +99,7 @@ export default async function handler(req) {
 
 async function getMoods(user, corsHeaders) {
   try {
-    const moods = await kv.get(`moods:${user.id}`) || [];
+    const moods = await storage.get(`moods:${user.id}`) || [];
     
     // Add user context to response for authenticated users
     const response = { 
@@ -119,7 +122,7 @@ async function getMoods(user, corsHeaders) {
 
 async function createMood(user, moodData, corsHeaders) {
   try {
-    const moods = await kv.get(`moods:${user.id}`) || [];
+    const moods = await storage.get(`moods:${user.id}`) || [];
     
     const newMood = {
       id: crypto.randomUUID(),
@@ -143,8 +146,8 @@ async function createMood(user, moodData, corsHeaders) {
     }
     
     // Longer expiry for authenticated users
-    const expiry = user.isAuthenticated ? (60 * 60 * 24 * 365 * 2) : (60 * 60 * 24 * 365);
-    await kv.set(`moods:${user.id}`, moods, { ex: expiry });
+    const ttl = user.isAuthenticated ? (60 * 60 * 24 * 365 * 2) : (60 * 60 * 24 * 365);
+    await storage.set(`moods:${user.id}`, moods, { ttl });
     
     return new NextResponse(
       JSON.stringify({ mood: newMood }),
@@ -157,7 +160,7 @@ async function createMood(user, moodData, corsHeaders) {
 
 async function updateMood(user, moodId, updateData, corsHeaders) {
   try {
-    const moods = await kv.get(`moods:${user.id}`) || [];
+    const moods = await storage.get(`moods:${user.id}`) || [];
     const moodIndex = moods.findIndex(mood => mood.id === moodId);
     
     if (moodIndex === -1) {
@@ -177,8 +180,8 @@ async function updateMood(user, moodId, updateData, corsHeaders) {
     
     moods[moodIndex] = { ...moods[moodIndex], ...updateData, updatedAt: new Date().toISOString() };
     
-    const expiry = user.isAuthenticated ? (60 * 60 * 24 * 365 * 2) : (60 * 60 * 24 * 365);
-    await kv.set(`moods:${user.id}`, moods, { ex: expiry });
+    const ttl = user.isAuthenticated ? (60 * 60 * 24 * 365 * 2) : (60 * 60 * 24 * 365);
+    await storage.set(`moods:${user.id}`, moods, { ttl });
     
     return new NextResponse(
       JSON.stringify({ mood: moods[moodIndex] }),
@@ -191,7 +194,7 @@ async function updateMood(user, moodId, updateData, corsHeaders) {
 
 async function deleteMood(user, moodId, corsHeaders) {
   try {
-    const moods = await kv.get(`moods:${user.id}`) || [];
+    const moods = await storage.get(`moods:${user.id}`) || [];
     const moodToDelete = moods.find(mood => mood.id === moodId);
     
     if (!moodToDelete) {
@@ -211,8 +214,8 @@ async function deleteMood(user, moodId, corsHeaders) {
     
     const filteredMoods = moods.filter(mood => mood.id !== moodId);
     
-    const expiry = user.isAuthenticated ? (60 * 60 * 24 * 365 * 2) : (60 * 60 * 24 * 365);
-    await kv.set(`moods:${user.id}`, filteredMoods, { ex: expiry });
+    const ttl = user.isAuthenticated ? (60 * 60 * 24 * 365 * 2) : (60 * 60 * 24 * 365);
+    await storage.set(`moods:${user.id}`, filteredMoods, { ttl });
     
     return new NextResponse(
       JSON.stringify({ message: 'Mood deleted successfully' }),

@@ -1,8 +1,11 @@
-import { kv } from '@vercel/kv';
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
+import { getStorageEngine } from './storage/CustomStorageEngine.js';
 
 export const runtime = 'edge';
+
+// Get custom storage instance
+const storage = getStorageEngine();
 
 // JWT Configuration
 const JWT_SECRET = new TextEncoder().encode(
@@ -85,7 +88,7 @@ export default async function handler(req) {
 
 async function getSettings(user, corsHeaders) {
   try {
-    const settings = await kv.get(`settings:${user.id}`) || {};
+    const settings = await storage.get(`settings:${user.id}`) || {};
     
     // Add account info for authenticated users
     if (user.isAuthenticated) {
@@ -115,7 +118,7 @@ async function getSettings(user, corsHeaders) {
 
 async function updateSettings(user, settingsData, corsHeaders) {
   try {
-    const existingSettings = await kv.get(`settings:${user.id}`) || {};
+    const existingSettings = await storage.get(`settings:${user.id}`) || {};
     
     // Don't allow account updates through settings API (use auth API instead)
     const { account, ...safeSettingsData } = settingsData;
@@ -135,8 +138,8 @@ async function updateSettings(user, settingsData, corsHeaders) {
     }
     
     // Longer expiry for authenticated users
-    const expiry = user.isAuthenticated ? (60 * 60 * 24 * 365 * 2) : (60 * 60 * 24 * 365);
-    await kv.set(`settings:${user.id}`, updatedSettings, { ex: expiry });
+    const ttl = user.isAuthenticated ? (60 * 60 * 24 * 365 * 2) : (60 * 60 * 24 * 365);
+    await storage.set(`settings:${user.id}`, updatedSettings, { ttl });
     
     return new NextResponse(
       JSON.stringify({ 

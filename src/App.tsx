@@ -1,17 +1,20 @@
 import React, { useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navigation } from './components/Navigation';
-import { MoodMap } from './components/MoodMap';
-import { MoodLogging } from './components/pages/MoodLogging';
-import { Analytics } from './components/pages/Analytics';
-import { Settings } from './components/pages/Settings';
-import { Community } from './components/pages/Community';
+import { 
+  OptimizedHome,
+  OptimizedMoodLogging,
+  OptimizedAnalytics,
+  OptimizedSettings,
+  OptimizedCommunity,
+  preloadComponents
+} from './components/LazyComponents';
 import { reportPerformanceMetrics } from './utils/deviceCapabilities';
 
 const AppContent: React.FC = () => {
   const { state } = useApp();
 
-  // Initialize performance monitoring
+  // Initialize performance monitoring and component preloading
   useEffect(() => {
     // Report initial performance metrics
     try {
@@ -19,22 +22,29 @@ const AppContent: React.FC = () => {
     } catch (error) {
       console.warn('Performance metrics failed:', error);
     }
+    
+    // Preload components for better performance
+    try {
+      preloadComponents();
+    } catch (error) {
+      console.warn('Component preloading failed:', error);
+    }
   }, []);
 
   const renderCurrentPage = () => {
     switch (state.currentTab) {
       case 'home':
-        return <MoodMap />;
+        return <OptimizedHome />;
       case 'log':
-        return <MoodLogging />;
+        return <OptimizedMoodLogging />;
       case 'analytics':
-        return <Analytics />;
+        return <OptimizedAnalytics />;
       case 'settings':
-        return <Settings />;
+        return <OptimizedSettings />;
       case 'community':
-        return <Community />;
+        return <OptimizedCommunity />;
       default:
-        return <MoodMap />;
+        return <OptimizedHome />;
     }
   };
 

@@ -1,11 +1,14 @@
-import { kv } from '@vercel/kv';
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { z } from 'zod';
 import validator from 'validator';
+import { getStorageEngine } from './storage/CustomStorageEngine.js';
 
 export const runtime = 'edge';
+
+// Get custom storage instance
+const storage = getStorageEngine();
 
 // JWT Configuration
 const JWT_SECRET = new TextEncoder().encode(
@@ -71,7 +74,7 @@ async function getUserFromToken(request) {
     return null;
   }
 
-  const user = await kv.get(`user:${payload.userId}`);
+  const user = await storage.get(`user:${payload.userId}`);
   return user;
 }
 
@@ -141,6 +144,8 @@ export default async function handler(req) {
         return await handleVerify(req, corsHeaders);
       case 'delete-account':
         return await handleDeleteAccount(req, corsHeaders);
+      case 'migrate-data':
+        return await handleMigrateData(req, corsHeaders);
       default:
         return new NextResponse(
           JSON.stringify({ error: 'Invalid endpoint' }),
@@ -189,7 +194,7 @@ async function handleRegister(req, corsHeaders) {
   }
 
   // Check if user already exists
-  const existingUser = await kv.get(`user:email:${sanitizedEmail}`);
+  const existingUser = await storage.get(`user:email:${sanitizedEmail}`);
   if (existingUser) {
     return new NextResponse(
       JSON.stringify({ error: 'User already exists with this email' }),
@@ -198,7 +203,7 @@ async function handleRegister(req, corsHeaders) {
   }
 
   // Check if username is taken
-  const existingUsername = await kv.get(`user:username:${username.toLowerCase()}`);
+  const existingUsername = await storage.get(`user:username:${username.toLowerCase()}`);
   if (existingUsername) {
     return new NextResponse(
       JSON.stringify({ error: 'Username is already taken' }),
@@ -222,12 +227,11 @@ async function handleRegister(req, corsHeaders) {
     lastLogin: now
   };
 
-  // Store user data
-  await Promise.all([
-    kv.set(`user:${userId}`, user, { ex: 60 * 60 * 24 * 365 * 2 }), // 2 years
-    kv.set(`user:email:${sanitizedEmail}`, userId, { ex: 60 * 60 * 24 * 365 * 2 }),
-    kv.set(`user:username:${username.toLowerCase()}`, userId, { ex: 60 * 60 * 24 * 365 * 2 })
-  ]);
+  // Store user data with 2 year TTL
+  const ttl = 60 * 60 * 24 * 365 * 2; // 2 years in seconds
+  await storage.set(`user:${userId}`, user, { ttl });
+  await storage.set(`user:email:${sanitizedEmail}`, userId, { ttl });
+  await storage.set(`user:username:${username.toLowerCase()}`, userId, { ttl });
 
   // Generate JWT
   const token = await generateJWT({ userId, username, email: sanitizedEmail });
@@ -267,7 +271,7 @@ async function handleLogin(req, corsHeaders) {
   const sanitizedEmail = validator.normalizeEmail(email);
 
   // Get user
-  const userId = await kv.get(`user:email:${sanitizedEmail}`);
+  const userId = await storage.get(`user:email:${sanitizedEmail}`);
   if (!userId) {
     return new NextResponse(
       JSON.stringify({ error: 'Invalid email or password' }),
@@ -275,7 +279,7 @@ async function handleLogin(req, corsHeaders) {
     );
   }
 
-  const user = await kv.get(`user:${userId}`);
+  const user = await storage.get(`user:${userId}`);
   if (!user) {
     return new NextResponse(
       JSON.stringify({ error: 'Invalid email or password' }),
@@ -294,7 +298,7 @@ async function handleLogin(req, corsHeaders) {
 
   // Update last login
   user.lastLogin = new Date().toISOString();
-  await kv.set(`user:${userId}`, user, { ex: 60 * 60 * 24 * 365 * 2 });
+  await storage.set(`user:${userId}`, user, { ttl: 60 * 60 * 24 * 365 * 2 });
 
   // Generate JWT
   const token = await generateJWT({ 
@@ -325,8 +329,6 @@ async function handleLogout(req, corsHeaders) {
   }
 
   // For JWT, logout is handled client-side by removing the token
-  // We could implement token blacklisting here if needed
-  
   return new NextResponse(
     JSON.stringify({ message: 'Logout successful' }),
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -389,7 +391,7 @@ async function handleProfile(req, corsHeaders) {
     // Update other fields
     if (updates.username && updates.username !== user.username) {
       // Check if username is available
-      const existingUsername = await kv.get(`user:username:${updates.username.toLowerCase()}`);
+      const existingUsername = await storage.get(`user:username:${updates.username.toLowerCase()}`);
       if (existingUsername && existingUsername !== user.id) {
         return new NextResponse(
           JSON.stringify({ error: 'Username is already taken' }),
@@ -398,9 +400,9 @@ async function handleProfile(req, corsHeaders) {
       }
 
       // Remove old username mapping
-      await kv.del(`user:username:${user.username.toLowerCase()}`);
+      await storage.del(`user:username:${user.username.toLowerCase()}`);
       // Add new username mapping
-      await kv.set(`user:username:${updates.username.toLowerCase()}`, user.id, { ex: 60 * 60 * 24 * 365 * 2 });
+      await storage.set(`user:username:${updates.username.toLowerCase()}`, user.id, { ttl: 60 * 60 * 24 * 365 * 2 });
       
       user.username = updates.username;
     }
@@ -415,7 +417,7 @@ async function handleProfile(req, corsHeaders) {
       }
 
       // Check if email is available
-      const existingEmail = await kv.get(`user:email:${sanitizedEmail}`);
+      const existingEmail = await storage.get(`user:email:${sanitizedEmail}`);
       if (existingEmail && existingEmail !== user.id) {
         return new NextResponse(
           JSON.stringify({ error: 'Email is already taken' }),
@@ -424,9 +426,9 @@ async function handleProfile(req, corsHeaders) {
       }
 
       // Remove old email mapping
-      await kv.del(`user:email:${user.email}`);
+      await storage.del(`user:email:${user.email}`);
       // Add new email mapping
-      await kv.set(`user:email:${sanitizedEmail}`, user.id, { ex: 60 * 60 * 24 * 365 * 2 });
+      await storage.set(`user:email:${sanitizedEmail}`, user.id, { ttl: 60 * 60 * 24 * 365 * 2 });
       
       user.email = sanitizedEmail;
     }
@@ -434,7 +436,7 @@ async function handleProfile(req, corsHeaders) {
     user.updatedAt = new Date().toISOString();
 
     // Save updated user
-    await kv.set(`user:${user.id}`, user, { ex: 60 * 60 * 24 * 365 * 2 });
+    await storage.set(`user:${user.id}`, user, { ttl: 60 * 60 * 24 * 365 * 2 });
 
     // Return user data (without password)
     const { password: _, ...userResponse } = user;
@@ -509,16 +511,60 @@ async function handleDeleteAccount(req, corsHeaders) {
   }
 
   // Delete all user data
-  await Promise.all([
-    kv.del(`user:${user.id}`),
-    kv.del(`user:email:${user.email}`),
-    kv.del(`user:username:${user.username.toLowerCase()}`),
-    kv.del(`moods:${user.id}`),
-    kv.del(`settings:${user.id}`)
-  ]);
+  await storage.del(`user:${user.id}`);
+  await storage.del(`user:email:${user.email}`);
+  await storage.del(`user:username:${user.username.toLowerCase()}`);
+  await storage.del(`moods:${user.id}`);
+  await storage.del(`settings:${user.id}`);
 
   return new NextResponse(
     JSON.stringify({ message: 'Account deleted successfully' }),
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
+}
+
+async function handleMigrateData(req, corsHeaders) {
+  if (req.method !== 'POST') {
+    return new NextResponse(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { status: 405, headers: corsHeaders }
+    );
+  }
+
+  const user = await getUserFromToken(req);
+  if (!user) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: corsHeaders }
+    );
+  }
+
+  const body = await req.json();
+  const { moods, settings } = body;
+
+  try {
+    // Store migrated data
+    if (moods && Array.isArray(moods)) {
+      await storage.set(`moods:${user.id}`, moods, { ttl: 60 * 60 * 24 * 365 * 2 });
+    }
+
+    if (settings && typeof settings === 'object') {
+      await storage.set(`settings:${user.id}`, settings, { ttl: 60 * 60 * 24 * 365 * 2 });
+    }
+
+    return new NextResponse(
+      JSON.stringify({ 
+        message: 'Data migrated successfully',
+        migratedMoods: moods?.length || 0,
+        migratedSettings: settings ? Object.keys(settings).length : 0
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Migration error:', error);
+    return new NextResponse(
+      JSON.stringify({ error: 'Failed to migrate data' }),
+      { status: 500, headers: corsHeaders }
+    );
+  }
 }
