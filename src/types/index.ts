@@ -80,4 +80,9 @@ export interface AppState {
   currentTab: NavigationTab;
   isLoading: boolean;
   error?: string;
+  syncStatus?: {
+    isOffline: boolean;
+    pendingSyncCount: number;
+    lastSyncTime?: Date;
+  };
 }

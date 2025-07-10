@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppState, MoodEntry, UserSettings, NavigationTab } from '../types';
+import { apiService } from '../services/api';
 
 interface AppContextType {
   state: AppState;
@@ -10,6 +11,12 @@ interface AppContextType {
   setCurrentTab: (tab: NavigationTab) => void;
   clearError: () => void;
   getMoodsByDateRange: (start: Date, end: Date) => MoodEntry[];
+  syncStatus: {
+    isOffline: boolean;
+    pendingSyncCount: number;
+    lastSyncTime?: Date;
+  };
+  forceSync: () => Promise<void>;
 }
 
 type AppAction =
@@ -19,7 +26,8 @@ type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string }
   | { type: 'CLEAR_ERROR' }
-  | { type: 'LOAD_DATA'; payload: { moods: MoodEntry[]; settings: UserSettings } };
+  | { type: 'LOAD_DATA'; payload: { moods: MoodEntry[]; settings: UserSettings } }
+  | { type: 'UPDATE_SYNC_STATUS'; payload: { isOffline: boolean; pendingSyncCount: number; lastSyncTime?: Date } };
 
 const defaultSettings: UserSettings = {
   notifications: {
@@ -88,6 +96,11 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
         userSettings: action.payload.settings,
         isLoading: false,
       };
+    case 'UPDATE_SYNC_STATUS':
+      return {
+        ...state,
+        syncStatus: action.payload,
+      };
     default:
       return state;
   }
@@ -108,49 +121,160 @@ interface AppProviderProps {
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  const [state, dispatch] = useReducer(appReducer, initialState);
-
-  // Load data from localStorage on mount
-  useEffect(() => {
-    try {
-      const savedMoods = localStorage.getItem('moodflow-moods');
-      const savedSettings = localStorage.getItem('moodflow-settings');
-      
-      const moods = savedMoods ? JSON.parse(savedMoods).map((mood: any) => ({
-        ...mood,
-        timestamp: new Date(mood.timestamp),
-      })) : [];
-      
-      const settings = savedSettings ? JSON.parse(savedSettings) : defaultSettings;
-      
-      dispatch({ type: 'LOAD_DATA', payload: { moods, settings } });
-    } catch (error) {
-      console.error('Error loading data from localStorage:', error);
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to load saved data' });
+  const [state, dispatch] = useReducer(appReducer, {
+    ...initialState,
+    syncStatus: {
+      isOffline: apiService.isOffline(),
+      pendingSyncCount: apiService.getPendingSyncCount(),
     }
+  });
+
+  // Load data from API/localStorage on mount
+  useEffect(() => {
+    const loadInitialData = async () => {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      
+      try {
+        // Load moods and settings in parallel
+        const [moodsResponse, settingsResponse] = await Promise.all([
+          apiService.getMoods(),
+          apiService.getSettings()
+        ]);
+
+        const moods = moodsResponse.data || [];
+        const settings = { ...defaultSettings, ...settingsResponse.data };
+
+        // If there's no server data but we have localStorage data, use localStorage
+        if (moods.length === 0) {
+          const localMoods = localStorage.getItem('moodflow-moods');
+          if (localMoods) {
+            const parsedMoods = JSON.parse(localMoods).map((mood: any) => ({
+              ...mood,
+              timestamp: new Date(mood.timestamp),
+            }));
+            dispatch({ type: 'LOAD_DATA', payload: { moods: parsedMoods, settings } });
+          } else {
+            dispatch({ type: 'LOAD_DATA', payload: { moods: [], settings } });
+          }
+        } else {
+          dispatch({ type: 'LOAD_DATA', payload: { moods, settings } });
+        }
+
+        // Show warning if using offline data
+        if (!moodsResponse.success || !settingsResponse.success) {
+          dispatch({ type: 'SET_ERROR', payload: 'Working offline - data will sync when connected' });
+          setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 5000);
+        }
+
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+        
+        // Fallback to localStorage only
+        try {
+          const savedMoods = localStorage.getItem('moodflow-moods');
+          const savedSettings = localStorage.getItem('moodflow-settings');
+          
+          const moods = savedMoods ? JSON.parse(savedMoods).map((mood: any) => ({
+            ...mood,
+            timestamp: new Date(mood.timestamp),
+          })) : [];
+          
+          const settings = savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
+          
+          dispatch({ type: 'LOAD_DATA', payload: { moods, settings } });
+          dispatch({ type: 'SET_ERROR', payload: 'Working offline - data will sync when connected' });
+          setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 5000);
+        } catch (localError) {
+          console.error('Error loading from localStorage:', localError);
+          dispatch({ type: 'SET_ERROR', payload: 'Failed to load data' });
+        }
+      }
+    };
+
+    loadInitialData();
   }, []);
 
-  // Save data to localStorage when state changes
+  // Update sync status periodically
   useEffect(() => {
-    try {
-      localStorage.setItem('moodflow-moods', JSON.stringify(state.moods));
-      localStorage.setItem('moodflow-settings', JSON.stringify(state.userSettings));
-    } catch (error) {
-      console.error('Error saving data to localStorage:', error);
-    }
-  }, [state.moods, state.userSettings]);
-
-  const addMood = (moodData: Omit<MoodEntry, 'id' | 'timestamp'>) => {
-    const mood: MoodEntry = {
-      ...moodData,
-      id: uuidv4(),
-      timestamp: new Date(),
+    const updateSyncStatus = () => {
+      dispatch({
+        type: 'UPDATE_SYNC_STATUS',
+        payload: {
+          isOffline: apiService.isOffline(),
+          pendingSyncCount: apiService.getPendingSyncCount(),
+          lastSyncTime: state.syncStatus?.lastSyncTime
+        }
+      });
     };
-    dispatch({ type: 'ADD_MOOD', payload: mood });
+
+    updateSyncStatus();
+    const interval = setInterval(updateSyncStatus, 10000); // Update every 10 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const addMood = async (moodData: Omit<MoodEntry, 'id' | 'timestamp'>) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    
+    try {
+      const response = await apiService.createMood(moodData);
+      
+      if (response.success && response.data) {
+        dispatch({ type: 'ADD_MOOD', payload: response.data });
+        
+        // Update sync status
+        dispatch({
+          type: 'UPDATE_SYNC_STATUS',
+          payload: {
+            isOffline: apiService.isOffline(),
+            pendingSyncCount: apiService.getPendingSyncCount(),
+            lastSyncTime: new Date()
+          }
+        });
+      } else {
+        // Even if API fails, the mood was still added to localStorage
+        const localMood: MoodEntry = {
+          id: uuidv4(),
+          ...moodData,
+          timestamp: new Date(),
+        };
+        dispatch({ type: 'ADD_MOOD', payload: localMood });
+        dispatch({ type: 'SET_ERROR', payload: 'Mood saved locally - will sync when online' });
+        setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 3000);
+      }
+    } catch (error) {
+      console.error('Error adding mood:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Failed to add mood' });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
   };
 
-  const updateSettings = (settings: Partial<UserSettings>) => {
-    dispatch({ type: 'UPDATE_SETTINGS', payload: settings });
+  const updateSettings = async (settings: Partial<UserSettings>) => {
+    try {
+      const response = await apiService.updateSettings(settings);
+      
+      if (response.success && response.data) {
+        dispatch({ type: 'UPDATE_SETTINGS', payload: response.data });
+        
+        // Update sync status
+        dispatch({
+          type: 'UPDATE_SYNC_STATUS',
+          payload: {
+            isOffline: apiService.isOffline(),
+            pendingSyncCount: apiService.getPendingSyncCount(),
+            lastSyncTime: new Date()
+          }
+        });
+      } else {
+        dispatch({ type: 'UPDATE_SETTINGS', payload: settings });
+        dispatch({ type: 'SET_ERROR', payload: 'Settings saved locally - will sync when online' });
+        setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 3000);
+      }
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Failed to update settings' });
+    }
   };
 
   const setCurrentTab = (tab: NavigationTab) => {
@@ -168,6 +292,43 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     });
   };
 
+  const forceSync = async (): Promise<void> => {
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      await apiService.syncData();
+      
+      // Reload data after sync
+      const [moodsResponse, settingsResponse] = await Promise.all([
+        apiService.getMoods(),
+        apiService.getSettings()
+      ]);
+
+      if (moodsResponse.success && settingsResponse.success) {
+        dispatch({
+          type: 'LOAD_DATA',
+          payload: {
+            moods: moodsResponse.data || [],
+            settings: { ...defaultSettings, ...settingsResponse.data }
+          }
+        });
+        
+        dispatch({
+          type: 'UPDATE_SYNC_STATUS',
+          payload: {
+            isOffline: apiService.isOffline(),
+            pendingSyncCount: apiService.getPendingSyncCount(),
+            lastSyncTime: new Date()
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error during force sync:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Sync failed - please try again' });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
+
   const value: AppContextType = {
     state,
     addMood,
@@ -175,6 +336,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setCurrentTab,
     clearError,
     getMoodsByDateRange,
+    syncStatus: state.syncStatus || {
+      isOffline: false,
+      pendingSyncCount: 0,
+    },
+    forceSync,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
