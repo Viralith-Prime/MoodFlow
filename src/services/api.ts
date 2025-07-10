@@ -93,9 +93,7 @@ class ApiService {
         return { success: true, data: moods };
       }
 
-      const url = authService.isAuthenticated() 
-        ? `${API_BASE}/moods`
-        : `${API_BASE}/moods?userId=${this.userId}`;
+      const url = `${API_BASE}/moods`;
 
       const response = await fetch(url, {
         method: 'GET',
@@ -148,9 +146,7 @@ class ApiService {
       // Try to sync to server if online
       if (this.isOnline) {
         try {
-          const url = authService.isAuthenticated() 
-            ? `${API_BASE}/moods`
-            : `${API_BASE}/moods?userId=${this.userId}`;
+          const url = `${API_BASE}/moods`;
 
           const response = await fetch(url, {
             method: 'POST',
