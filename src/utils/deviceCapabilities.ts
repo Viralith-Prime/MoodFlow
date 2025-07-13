@@ -114,9 +114,9 @@ class DeviceCapabilityDetector {
 
   private checkLowEndDevice(): boolean {
     // Detect low-end devices based on multiple factors
-    const memory = (navigator as any).deviceMemory;
+    const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
     const cores = navigator.hardwareConcurrency;
-    const connection = (navigator as any).connection;
+    const connection = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
 
     let score = 0;
 
@@ -153,7 +153,7 @@ class DeviceCapabilityDetector {
   }
 
   private getConnectionType(): string {
-    const connection = (navigator as any).connection;
+    const connection = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
     if (connection) {
       return connection.effectiveType || 'unknown';
     }
@@ -161,7 +161,7 @@ class DeviceCapabilityDetector {
   }
 
   private getMemoryLevel(): 'low' | 'medium' | 'high' {
-    const memory = (navigator as any).deviceMemory;
+    const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
     if (memory) {
       if (memory < 2) return 'low';
       if (memory < 6) return 'medium';
@@ -196,7 +196,7 @@ class DeviceCapabilityDetector {
         webp: this.checkWebPSupport(),
         avif: this.checkAVIFSupport(),
       };
-    } catch (error) {
+    } catch {
       return {
         modernJS: true,
         flexbox: true,

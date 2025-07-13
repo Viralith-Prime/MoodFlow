@@ -20,6 +20,7 @@ import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import validator from 'validator';
+import { SignJWT, jwtVerify } from 'jose';
 
 class CustomAuthEngine {
   constructor(config = {}) {

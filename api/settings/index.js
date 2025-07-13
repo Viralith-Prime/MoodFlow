@@ -1,5 +1,6 @@
 import { storageAdapter } from '../storage/StorageAdapter.js';
 import { authEngine } from '../auth/CustomAuthEngine.js';
+import { jwtVerify } from 'jose';
 import { z } from 'zod';
 
 const withErrorHandling = (handler) => async (req, res) => {
@@ -39,7 +40,7 @@ async function getUserFromToken(req) {
     if (!payload || !payload.userId) {
       return null;
     }
-    const user = await storage.get(`user:${payload.userId}`);
+    const user = await storageAdapter.get(`user:${payload.userId}`);
     return user;
   } catch (error) {
     return null;
@@ -68,7 +69,7 @@ const handler = async (req, res) => {
   try {
     if (req.method === 'GET') {
       // Get user settings
-      const userSettings = await storage.get(`settings:${user.id}`) || {
+      const userSettings = await storageAdapter.get(`settings:${user.id}`) || {
         theme: 'light',
         notifications: true,
         privacy: 'private',
@@ -104,7 +105,7 @@ const handler = async (req, res) => {
       }
 
       // Get current settings
-      const currentSettings = await storage.get(`settings:${user.id}`) || {};
+      const currentSettings = await storageAdapter.get(`settings:${user.id}`) || {};
       
       // Merge with new settings
       const updatedSettings = {
@@ -119,7 +120,7 @@ const handler = async (req, res) => {
       
       while (retryCount < maxRetries) {
         try {
-          await storage.set(`settings:${user.id}`, updatedSettings);
+          await storageAdapter.set(`settings:${user.id}`, updatedSettings);
           break;
         } catch (error) {
           retryCount++;
@@ -155,7 +156,7 @@ const handler = async (req, res) => {
         updatedAt: new Date().toISOString()
       };
 
-      await storage.set(`settings:${user.id}`, defaultSettings);
+      await storageAdapter.set(`settings:${user.id}`, defaultSettings);
 
       console.log(`🔄 Settings reset to defaults for user ${user.id}`);
 

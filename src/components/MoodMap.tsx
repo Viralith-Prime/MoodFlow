@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { DivIcon } from 'leaflet';
 import type { LatLngExpression } from 'leaflet';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context/useApp';
 import { MOOD_OPTIONS, DEFAULT_LOCATION } from '../constants/moods';
 import type { MoodEntry } from '../types';
 

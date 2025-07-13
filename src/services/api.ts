@@ -86,9 +86,9 @@ class ApiService {
       if (!this.isOnline) {
         // Fallback to localStorage when offline
         const localMoods = localStorage.getItem(storageKey);
-        const moods = localMoods ? JSON.parse(localMoods).map((mood: any) => ({
+        const moods = localMoods ? JSON.parse(localMoods).map((mood: Record<string, unknown>) => ({
           ...mood,
-          timestamp: new Date(mood.timestamp)
+          timestamp: new Date(mood.timestamp as string)
         })) : [];
         return { success: true, data: moods };
       }
@@ -105,9 +105,9 @@ class ApiService {
       const result = await response.json();
       
       // Update localStorage with server data
-      const moods = result.moods.map((mood: any) => ({
+      const moods = result.moods.map((mood: Record<string, unknown>) => ({
         ...mood,
-        timestamp: new Date(mood.timestamp)
+        timestamp: new Date(mood.timestamp as string)
       }));
       localStorage.setItem(storageKey, JSON.stringify(moods));
       
@@ -118,9 +118,9 @@ class ApiService {
       // Fallback to localStorage on error
       const storageKey = this.getStorageKey('moods');
       const localMoods = localStorage.getItem(storageKey);
-      const moods = localMoods ? JSON.parse(localMoods).map((mood: any) => ({
+      const moods = localMoods ? JSON.parse(localMoods).map((mood: Record<string, unknown>) => ({
         ...mood,
-        timestamp: new Date(mood.timestamp)
+        timestamp: new Date(mood.timestamp as string)
       })) : [];
       
       return { success: false, data: moods, error: 'Using offline data' };
@@ -139,7 +139,7 @@ class ApiService {
       };
 
       const localMoods = localStorage.getItem(storageKey);
-      const moods = localMoods ? JSON.parse(localMoods) : [];
+      const moods = localMoods ? JSON.parse(localMoods) as MoodEntry[] : [];
       moods.unshift(newMood);
       localStorage.setItem(storageKey, JSON.stringify(moods));
 
@@ -267,7 +267,7 @@ class ApiService {
   }
 
   // Sync management
-  private markForSync(type: 'mood' | 'settings', data: any) {
+  private markForSync(type: 'mood' | 'settings', data: MoodEntry | UserSettings) {
     const syncQueue = JSON.parse(localStorage.getItem('moodflow-sync-queue') || '[]');
     syncQueue.push({ type, data, timestamp: Date.now() });
     localStorage.setItem('moodflow-sync-queue', JSON.stringify(syncQueue));

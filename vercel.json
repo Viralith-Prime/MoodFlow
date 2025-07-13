@@ -4,29 +4,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "api/**/*.js",
-      "use": "@vercel/node",
-      "config": {
-        "runtime": "nodejs18.x",
-        "maxDuration": 30
-      }
-    }
-  ],
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs18.x",
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
     {
       "source": "/api/auth/register",
@@ -118,7 +95,7 @@
   ],
   "env": {
     "NODE_ENV": "production",
-    "AUTH_SECRET_KEY": "@auth_secret_key"
+    "JWT_SECRET": "@jwt_secret"
   },
   "regions": ["iad1"]
 }

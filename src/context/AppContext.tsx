@@ -1,27 +1,10 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { useReducer, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppState, MoodEntry, UserSettings, NavigationTab, AuthState, User } from '../types';
 import { apiService } from '../services/api';
 import { authService } from '../services/authService';
-
-interface AppContextType {
-  state: AppState;
-  addMood: (mood: Omit<MoodEntry, 'id' | 'timestamp'>) => void;
-  updateSettings: (settings: Partial<UserSettings>) => void;
-  setCurrentTab: (tab: NavigationTab) => void;
-  clearError: () => void;
-  getMoodsByDateRange: (start: Date, end: Date) => MoodEntry[];
-  syncStatus: {
-    isOffline: boolean;
-    pendingSyncCount: number;
-    lastSyncTime?: Date;
-  };
-  forceSync: () => Promise<void>;
-  // Authentication methods
-  setAuthState: (authState: AuthState) => void;
-  updateUser: (user: User | null) => void;
-}
+import { AppContext, type AppContextType } from './AppContextDefinition';
 
 type AppAction =
   | { type: 'ADD_MOOD'; payload: MoodEntry }
@@ -132,15 +115,7 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
   }
 };
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export const useApp = (): AppContextType => {
-  const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  return context;
-};
 
 interface AppProviderProps {
   children: ReactNode;
@@ -171,9 +146,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         const savedMoods = localStorage.getItem('moodflow-moods');
         const savedSettings = localStorage.getItem('moodflow-settings');
         
-        const localMoods = savedMoods ? JSON.parse(savedMoods).map((mood: any) => ({
+        const localMoods = savedMoods ? JSON.parse(savedMoods).map((mood: Record<string, unknown>) => ({
           ...mood,
-          timestamp: new Date(mood.timestamp),
+          timestamp: new Date(mood.timestamp as string),
         })) : [];
         
         const localSettings = savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
@@ -191,7 +166,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
             // Only update if API has newer data
             if (moodsResponse.success && moodsResponse.data && moodsResponse.data.length > 0) {
-              const serverMoods = moodsResponse.data.map((mood: any) => ({
+              const serverMoods = moodsResponse.data.map((mood: MoodEntry) => ({
                 ...mood,
                 timestamp: new Date(mood.timestamp),
               }));
@@ -233,7 +208,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     const interval = setInterval(updateSyncStatus, 10000); // Update every 10 seconds
     
     return () => clearInterval(interval);
-  }, []);
+  }, [state.syncStatus?.lastSyncTime]);
 
   const addMood = async (moodData: Omit<MoodEntry, 'id' | 'timestamp'>) => {
     dispatch({ type: 'SET_LOADING', payload: true });

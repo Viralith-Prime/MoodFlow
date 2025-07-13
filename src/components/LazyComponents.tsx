@@ -6,7 +6,7 @@ import { useOptimizedConfig } from '../utils/deviceCapabilities';
 const LoadingFallback: React.FC<{ 
   component: string; 
   height?: string;
-  icon?: React.ComponentType<any>;
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }> = ({ component, height = "h-full", icon: Icon = ArrowPathIcon }) => (
   <div className={`${height} flex items-center justify-center bg-gray-50`}>
     <div className="text-center">
@@ -177,28 +177,3 @@ export const OptimizedCommunity: React.FC = () => {
   );
 };
 
-// Preload components for high-performance devices
-export const preloadComponents = () => {
-  try {
-    const config = useOptimizedConfig();
-    
-    if (config.performanceConfig.enablePrefetching) {
-      // Preload critical components
-      Promise.all([
-        import('./MoodMap'),
-        import('./pages/MoodLogging'),
-      ]).catch(err => console.warn('Component preload failed:', err));
-      
-      // Preload secondary components after a delay
-      setTimeout(() => {
-        Promise.all([
-          import('./pages/Analytics'),
-          import('./pages/Settings'),
-          import('./pages/Community'),
-        ]).catch(err => console.warn('Secondary component preload failed:', err));
-      }, 2000);
-    }
-  } catch (error) {
-    console.warn('Preload setup failed:', error);
-  }
-};
