@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ChartBarIcon, CalendarIcon, ArrowTrendingUpIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { useApp } from '../../context/AppContext';
+import { useApp } from '../../context/useApp';
 import { MOOD_OPTIONS } from '../../constants/moods';
 
 

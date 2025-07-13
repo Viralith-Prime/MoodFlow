@@ -220,7 +220,7 @@ export const Community: React.FC = () => {
       } else {
         setError(response.error || 'Login failed');
       }
-    } catch (error) {
+    } catch (error) { // eslint-disable-line @typescript-eslint/no-unused-vars
       setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
@@ -260,7 +260,7 @@ export const Community: React.FC = () => {
       } else {
         setError(response.error || 'Registration failed');
       }
-    } catch (error) {
+    } catch (error) { // eslint-disable-line @typescript-eslint/no-unused-vars
       setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
@@ -274,7 +274,7 @@ export const Community: React.FC = () => {
       setUser(null);
       setCurrentView('welcome');
       setSuccessMessage('Logged out successfully');
-    } catch (error) {
+    } catch (error) { // eslint-disable-line @typescript-eslint/no-unused-vars
       setError('Logout failed');
     } finally {
       setIsLoading(false);
@@ -293,7 +293,7 @@ export const Community: React.FC = () => {
       } else {
         setError(response.error || 'Migration failed');
       }
-    } catch (error) {
+    } catch (error) { // eslint-disable-line @typescript-eslint/no-unused-vars
       setError('Network error during migration');
     } finally {
       setIsLoading(false);
@@ -869,7 +869,7 @@ export const Community: React.FC = () => {
                       } else {
                         setError(response.error || 'Failed to delete account');
                       }
-                    } catch (error) {
+                    } catch (error) { // eslint-disable-line @typescript-eslint/no-unused-vars
                       setError('Network error');
                     } finally {
                       setIsLoading(false);

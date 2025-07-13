@@ -1,7 +1,7 @@
 import React from 'react';
 import { MapIcon, PlusIcon, ChartBarIcon, Cog6ToothIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { MapIcon as MapIconSolid, PlusIcon as PlusIconSolid, ChartBarIcon as ChartBarIconSolid, Cog6ToothIcon as Cog6ToothIconSolid, UserGroupIcon as UserGroupIconSolid } from '@heroicons/react/24/solid';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context/useApp';
 import type { NavigationTab } from '../types';
 
 interface NavigationProps {

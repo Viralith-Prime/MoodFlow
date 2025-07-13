@@ -1,7 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { ArrowPathIcon, MapIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { useOptimizedConfig } from '../utils/deviceCapabilities';
-import { preloadComponents } from '../utils/componentPreloader';
 
 // Loading fallback component
 const LoadingFallback: React.FC<{ 

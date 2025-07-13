@@ -13,11 +13,11 @@ import {
   MoonIcon,
   ComputerDesktopIcon
 } from '@heroicons/react/24/outline';
-import { useApp } from '../../context/AppContext';
+import { useApp } from '../../context/useApp';
 
 
 interface SettingsSectionProps {
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   title: string;
   description: string;
   children: React.ReactNode;
@@ -223,13 +223,13 @@ export const Settings: React.FC = () => {
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [showExportSuccess, setShowExportSuccess] = useState(false);
 
-  const handleSettingChange = (path: string, value: any) => {
+  const handleSettingChange = (path: string, value: string | number | boolean) => {
     const pathArray = path.split('.');
     const newSettings = { ...state.userSettings };
     
-    let current: any = newSettings;
+    let current: Record<string, unknown> = newSettings;
     for (let i = 0; i < pathArray.length - 1; i++) {
-      current = current[pathArray[i]];
+      current = current[pathArray[i]] as Record<string, unknown>;
     }
     current[pathArray[pathArray.length - 1]] = value;
     

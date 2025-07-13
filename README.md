@@ -28,7 +28,7 @@
 
 ### Backend
 - **Vercel Serverless Functions** (Node.js 18.x)
-- **Custom Storage Engine** with encryption & compression
+- **Hybrid Storage System** - Postgres persistence with local fallback
 - **JWT Authentication** with bcrypt
 - **Rate Limiting & Security** built-in
 
@@ -38,6 +38,8 @@
 - 🔒 **Enterprise Security**: AES-256 encryption, rate limiting, CORS
 - 📊 **Performance Monitoring**: Real-time metrics and optimization
 - 🌐 **Mobile Optimization**: Battery-aware and low-memory mode support
+- 💾 **Hybrid Storage**: Postgres persistence with local storage fallback
+- 🔄 **Real-time Sync**: Background data synchronization
 
 ## 🚀 Quick Start
 
@@ -83,6 +85,7 @@ Create these environment variables in your Vercel dashboard:
 ```env
 JWT_SECRET=your-super-secure-jwt-secret-here
 NODE_ENV=production
+DATABASE_URL=your-vercel-postgres-connection-string
 ```
 
 ## 🏗️ Project Structure
@@ -100,7 +103,7 @@ moodflow-app/
 │   ├── auth/              # Authentication endpoints
 │   ├── moods/             # Mood tracking endpoints
 │   ├── settings/          # User settings endpoints
-│   └── storage/           # Custom storage engine
+│   └── storage/           # Hybrid storage engine (Postgres + local)
 ├── public/                # Static assets
 └── dist/                  # Production build output
 ```

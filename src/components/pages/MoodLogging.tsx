@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapIcon, CheckIcon } from '@heroicons/react/24/outline';
-import { useApp } from '../../context/AppContext';
+import { useApp } from '../../context/useApp';
 import { MOOD_OPTIONS, INTENSITY_LABELS, DEFAULT_LOCATION } from '../../constants/moods';
 import type { MoodEntry } from '../../types';
 

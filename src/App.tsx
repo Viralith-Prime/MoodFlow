@@ -1,14 +1,15 @@
 import React, { useEffect } from 'react';
-import { AppProvider, useApp } from './context/AppContext';
+import { AppProvider } from './context/AppContext';
+import { useApp } from './context/useApp';
 import { Navigation } from './components/Navigation';
 import { 
   OptimizedHome,
   OptimizedMoodLogging,
   OptimizedAnalytics,
   OptimizedSettings,
-  OptimizedCommunity,
-  preloadComponents
+  OptimizedCommunity
 } from './components/LazyComponents';
+import { preloadComponents } from './utils/componentPreloader';
 import { reportPerformanceMetrics } from './utils/deviceCapabilities';
 
 const AppContent: React.FC = () => {
