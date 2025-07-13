@@ -12,8 +12,10 @@
  * - Performance optimization
  */
 
-import { sql } from '@vercel/postgres';
 import { storage as customStorage } from './index.js';
+
+// Optional Postgres import - will be undefined if not available
+let sql = null;
 
 class StorageAdapter {
   constructor(config = {}) {
@@ -37,94 +39,109 @@ class StorageAdapter {
 
   async initDatabase() {
     try {
-      // Create users table
-      await sql`
-        CREATE TABLE IF NOT EXISTS users (
-          id VARCHAR(255) PRIMARY KEY,
-          email VARCHAR(255) UNIQUE NOT NULL,
-          username VARCHAR(255) NOT NULL,
-          password_hash VARCHAR(255) NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          last_login TIMESTAMP,
-          login_attempts INTEGER DEFAULT 0,
-          account_locked BOOLEAN DEFAULT FALSE,
-          lockout_expiry TIMESTAMP,
-          metadata JSONB
-        )
-      `;
+      // Try to initialize Postgres if available
+      if (sql) {
+        try {
+          // Create users table
+          await sql`
+            CREATE TABLE IF NOT EXISTS users (
+              id VARCHAR(255) PRIMARY KEY,
+              email VARCHAR(255) UNIQUE NOT NULL,
+              username VARCHAR(255) NOT NULL,
+              password_hash VARCHAR(255) NOT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              last_login TIMESTAMP,
+              login_attempts INTEGER DEFAULT 0,
+              account_locked BOOLEAN DEFAULT FALSE,
+              lockout_expiry TIMESTAMP,
+              metadata JSONB
+            )
+          `;
 
-      // Create moods table
-      await sql`
-        CREATE TABLE IF NOT EXISTS moods (
-          id VARCHAR(255) PRIMARY KEY,
-          user_id VARCHAR(255) NOT NULL,
-          mood VARCHAR(50) NOT NULL,
-          notes TEXT,
-          location JSONB,
-          timestamp TIMESTAMP NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-      `;
+          // Create moods table
+          await sql`
+            CREATE TABLE IF NOT EXISTS moods (
+              id VARCHAR(255) PRIMARY KEY,
+              user_id VARCHAR(255) NOT NULL,
+              mood VARCHAR(50) NOT NULL,
+              notes TEXT,
+              location JSONB,
+              timestamp TIMESTAMP NOT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+          `;
 
-      // Create settings table
-      await sql`
-        CREATE TABLE IF NOT EXISTS settings (
-          user_id VARCHAR(255) PRIMARY KEY,
-          theme VARCHAR(20) DEFAULT 'light',
-          notifications BOOLEAN DEFAULT TRUE,
-          privacy VARCHAR(20) DEFAULT 'private',
-          language VARCHAR(10) DEFAULT 'en',
-          timezone VARCHAR(50) DEFAULT 'UTC',
-          mood_reminders BOOLEAN DEFAULT TRUE,
-          reminder_frequency VARCHAR(20) DEFAULT 'daily',
-          data_export BOOLEAN DEFAULT FALSE,
-          share_location BOOLEAN DEFAULT FALSE,
-          analytics_enabled BOOLEAN DEFAULT TRUE,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-      `;
+          // Create settings table
+          await sql`
+            CREATE TABLE IF NOT EXISTS settings (
+              user_id VARCHAR(255) PRIMARY KEY,
+              theme VARCHAR(20) DEFAULT 'light',
+              notifications BOOLEAN DEFAULT TRUE,
+              privacy VARCHAR(20) DEFAULT 'private',
+              language VARCHAR(10) DEFAULT 'en',
+              timezone VARCHAR(50) DEFAULT 'UTC',
+              mood_reminders BOOLEAN DEFAULT TRUE,
+              reminder_frequency VARCHAR(20) DEFAULT 'daily',
+              data_export BOOLEAN DEFAULT FALSE,
+              share_location BOOLEAN DEFAULT FALSE,
+              analytics_enabled BOOLEAN DEFAULT TRUE,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+          `;
 
-      // Create auth_tokens table for custom auth system
-      await sql`
-        CREATE TABLE IF NOT EXISTS auth_tokens (
-          id VARCHAR(255) PRIMARY KEY,
-          user_id VARCHAR(255) NOT NULL,
-          token_hash VARCHAR(255) NOT NULL,
-          token_type VARCHAR(50) NOT NULL,
-          expires_at TIMESTAMP NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          last_used TIMESTAMP,
-          device_info JSONB,
-          ip_address VARCHAR(45),
-          is_active BOOLEAN DEFAULT TRUE,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-      `;
+          // Create auth_tokens table for custom auth system
+          await sql`
+            CREATE TABLE IF NOT EXISTS auth_tokens (
+              id VARCHAR(255) PRIMARY KEY,
+              user_id VARCHAR(255) NOT NULL,
+              token_hash VARCHAR(255) NOT NULL,
+              token_type VARCHAR(50) NOT NULL,
+              expires_at TIMESTAMP NOT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              last_used TIMESTAMP,
+              device_info JSONB,
+              ip_address VARCHAR(45),
+              is_active BOOLEAN DEFAULT TRUE,
+              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+          `;
 
-      // Create audit_log table
-      await sql`
-        CREATE TABLE IF NOT EXISTS audit_log (
-          id SERIAL PRIMARY KEY,
-          user_id VARCHAR(255),
-          action VARCHAR(100) NOT NULL,
-          resource_type VARCHAR(50),
-          resource_id VARCHAR(255),
-          ip_address VARCHAR(45),
-          user_agent TEXT,
-          timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          metadata JSONB
-        )
-      `;
+          // Create audit_log table
+          await sql`
+            CREATE TABLE IF NOT EXISTS audit_log (
+              id SERIAL PRIMARY KEY,
+              user_id VARCHAR(255),
+              action VARCHAR(100) NOT NULL,
+              resource_type VARCHAR(50),
+              resource_id VARCHAR(255),
+              ip_address VARCHAR(45),
+              user_agent TEXT,
+              timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              metadata JSONB
+            )
+          `;
 
-      console.log('✅ Database tables initialized successfully');
+          console.log('✅ Postgres database tables initialized successfully');
+          this.config.enablePersistence = true;
+        } catch (postgresError) {
+          console.warn('⚠️ Postgres initialization failed, falling back to local storage:', postgresError.message);
+          this.config.enablePersistence = false;
+        }
+      } else {
+        console.log('ℹ️ Postgres not available, using local storage only');
+        this.config.enablePersistence = false;
+      }
+      
       this.isInitialized = true;
     } catch (error) {
-      console.error('❌ Database initialization failed:', error);
-      throw error;
+      console.error('❌ Storage initialization failed:', error);
+      // Don't throw error, just disable persistence
+      this.config.enablePersistence = false;
+      this.isInitialized = true;
     }
   }
 
