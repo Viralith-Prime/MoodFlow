@@ -123,7 +123,13 @@ const handler = async (req, res) => {
       message: 'Login successful',
       token: authResult.session.token,
       expiresAt: authResult.session.expiresAt,
-      user: authResult.user
+      user: {
+        id: authResult.user.id,
+        username: authResult.user.username,
+        email: authResult.user.email,
+        createdAt: authResult.user.createdAt,
+        preferences: authResult.user.preferences
+      }
     });
 
   } catch (error) {

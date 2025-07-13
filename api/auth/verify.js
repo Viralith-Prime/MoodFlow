@@ -1,13 +1,16 @@
-import { storage } from '../storage/index.js';
-import { jwtVerify } from 'jose';
+import { storageAdapter } from '../storage/StorageAdapter.js';
+import { authEngine } from './CustomAuthEngine.js';
 
+// Comprehensive error handling wrapper
 const withErrorHandling = (handler) => async (req, res) => {
   try {
+    // Set CORS headers for all requests
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     
+    // Handle preflight requests
     if (req.method === 'OPTIONS') {
       return res.status(200).json({ success: true });
     }
@@ -22,61 +25,61 @@ const withErrorHandling = (handler) => async (req, res) => {
   }
 };
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'moodflow-super-secure-jwt-key-production-2024'
-);
-
 const handler = async (req, res) => {
+  // Method validation
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const authHeader = req.headers.authorization || req.headers.Authorization;
-    
+    // Get authorization header
+    const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(200).json({ 
-        authenticated: false, 
-        user: null 
+      return res.status(401).json({ 
+        authenticated: false,
+        error: 'No token provided' 
       });
     }
 
-    const token = authHeader.slice(7);
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    // Verify token using auth engine
+    const verificationResult = await authEngine.verifyToken(token, storageAdapter);
+
+    if (!verificationResult.valid) {
+      return res.status(401).json({ 
+        authenticated: false,
+        error: verificationResult.reason 
+      });
+    }
+
+    // Get user data
+    const user = await storageAdapter.get(`user:${verificationResult.userId}`);
     
-    try {
-      const { payload } = await jwtVerify(token, JWT_SECRET);
-      
-      if (!payload || !payload.userId) {
-        return res.status(200).json({ 
-          authenticated: false, 
-          user: null 
-        });
-      }
-
-      const user = await storage.get(`user:${payload.userId}`);
-      
-      if (!user) {
-        return res.status(200).json({ 
-          authenticated: false, 
-          user: null 
-        });
-      }
-
-      const { password: _, ...userResponse } = user;
-      
-      return res.status(200).json({ 
-        authenticated: true, 
-        user: userResponse 
-      });
-    } catch (jwtError) {
-      return res.status(200).json({ 
-        authenticated: false, 
-        user: null 
+    if (!user) {
+      return res.status(401).json({ 
+        authenticated: false,
+        error: 'User not found' 
       });
     }
+
+    console.log(`✅ Token verified for user: ${user.email}`);
+
+    return res.status(200).json({
+      authenticated: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        createdAt: user.createdAt,
+        preferences: user.preferences
+      }
+    });
+
   } catch (error) {
-    console.error('Verify error:', error);
+    console.error('Token verification error:', error);
     return res.status(500).json({ 
+      authenticated: false,
       error: 'Internal server error' 
     });
   }

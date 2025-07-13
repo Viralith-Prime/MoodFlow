@@ -44,10 +44,6 @@ const checkRateLimit = (identifier, limit = 5, window = 15 * 60 * 1000) => {
   return true;
 };
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'moodflow-super-secure-jwt-key-production-2024'
-);
-
 const registerSchema = z.object({
   username: z.string()
     .min(3, 'Username must be at least 3 characters')
@@ -59,7 +55,6 @@ const registerSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .max(128, 'Password is too long')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one uppercase letter, one lowercase letter, and one number')
 });
 
 const handler = async (req, res) => {
@@ -107,26 +102,9 @@ const handler = async (req, res) => {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    // Check for existing users with retry logic
-    let retryCount = 0;
-    const maxRetries = 3;
-    let existingUser, existingUsername;
-
-    while (retryCount < maxRetries) {
-      try {
-        [existingUser, existingUsername] = await Promise.all([
-          storage.get(`user:email:${sanitizedEmail}`),
-          storage.get(`user:username:${username.toLowerCase()}`)
-        ]);
-        break;
-      } catch (error) {
-        retryCount++;
-        if (retryCount >= maxRetries) {
-          throw new Error('Failed to check existing users after multiple attempts');
-        }
-        await new Promise(resolve => setTimeout(resolve, 100 * retryCount));
-      }
-    }
+    // Check for existing users
+    const existingUser = await storageAdapter.get(`user:email:${sanitizedEmail}`);
+    const existingUsername = await storageAdapter.get(`user:username:${username.toLowerCase()}`);
 
     if (existingUser) {
       return res.status(409).json({ 
@@ -140,7 +118,7 @@ const handler = async (req, res) => {
       });
     }
 
-    // Create user with enhanced security
+    // Create user
     const userId = crypto.randomUUID();
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
@@ -164,68 +142,44 @@ const handler = async (req, res) => {
       }
     };
 
-    // Store user data with retry logic
-    retryCount = 0;
-    while (retryCount < maxRetries) {
-      try {
-        await Promise.all([
-          storage.set(`user:${userId}`, user),
-          storage.set(`user:email:${sanitizedEmail}`, userId),
-          storage.set(`user:username:${username.toLowerCase()}`, userId)
-        ]);
-        break;
-      } catch (error) {
-        retryCount++;
-        if (retryCount >= maxRetries) {
-          throw new Error('Failed to create user after multiple attempts');
-        }
-        await new Promise(resolve => setTimeout(resolve, 100 * retryCount));
-      }
-    }
+    // Store user data
+    await Promise.all([
+      storageAdapter.set(`user:${userId}`, user),
+      storageAdapter.set(`user:email:${sanitizedEmail}`, userId),
+      storageAdapter.set(`user:username:${username.toLowerCase()}`, userId)
+    ]);
 
-    // Generate JWT with enhanced payload
-    const tokenPayload = {
-      userId,
-      username,
-      email: sanitizedEmail,
-      iat: Math.floor(Date.now() / 1000)
+    // Get device info for authentication
+    const deviceInfo = {
+      ipAddress: req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown',
+      userAgent: req.headers['user-agent'] || '',
+      screenResolution: req.headers['sec-ch-viewport-width'] ? 
+        `${req.headers['sec-ch-viewport-width']}x${req.headers['sec-ch-viewport-height']}` : '',
+      timezone: req.headers['sec-ch-prefers-color-scheme'] || '',
+      language: req.headers['accept-language'] || ''
     };
 
-    const token = await new SignJWT(tokenPayload)
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime('7d')
-      .sign(JWT_SECRET);
+    // Create session using auth engine
+    const session = await authEngine.createSession(userId, deviceInfo, storageAdapter);
 
-    // Prepare response (exclude sensitive data)
-    const { password: _, ...userResponse } = user;
-    
-    // Log successful registration
-    console.log(`✅ User registered successfully: ${sanitizedEmail} (${userId})`);
-    
-    return res.status(201).json({ 
+    console.log(`✅ User ${username} registered successfully`);
+
+    return res.status(201).json({
       success: true,
-      user: userResponse, 
-      token,
-      message: 'Account created successfully'
+      message: 'Account created successfully',
+      token: session.token,
+      expiresAt: session.expiresAt,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        createdAt: user.createdAt,
+        preferences: user.preferences
+      }
     });
 
   } catch (error) {
     console.error('Registration error:', error);
-    
-    // Return appropriate error response
-    if (error.message.includes('Failed to check existing users')) {
-      return res.status(503).json({ 
-        error: 'Service temporarily unavailable. Please try again.' 
-      });
-    }
-    
-    if (error.message.includes('Failed to create user')) {
-      return res.status(503).json({ 
-        error: 'Failed to create account. Please try again.' 
-      });
-    }
-
     return res.status(500).json({ 
       error: 'Internal server error' 
     });
