@@ -17,7 +17,7 @@ import { authService } from '../../services/authService';
 import type { LoginCredentials, RegisterCredentials, User } from '../../types';
 
 interface FormSectionProps {
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   title: string;
   description: string;
   children: React.ReactNode;
@@ -190,8 +190,8 @@ export const Community: React.FC = () => {
       } else {
         setCurrentView('welcome');
       }
-    } catch (error) {
-      console.error('Auth check failed:', error);
+    } catch {
+      console.error('Auth check failed');
       setCurrentView('welcome');
     } finally {
       setIsLoading(false);

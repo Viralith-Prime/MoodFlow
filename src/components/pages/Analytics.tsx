@@ -250,7 +250,11 @@ export const Analytics: React.FC = () => {
     return `${date.getMonth() + 1}/${date.getDate()}`;
   };
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: {
+    active?: boolean;
+    payload?: Array<{ name: string; value: number; color: string }>;
+    label?: string;
+  }) => {
     if (active && payload && payload.length) {
       return (
         <div style={{
@@ -261,9 +265,9 @@ export const Analytics: React.FC = () => {
           border: '1px solid #e5e7eb'
         }}>
           <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600 }}>
-            {formatDate(label)}
+            {formatDate(label || '')}
           </p>
-          {payload.map((item: any, index: number) => (
+          {payload.map((item: { name: string; value: number; color: string }, index: number) => (
             <p key={index} style={{ margin: 0, fontSize: '0.875rem', color: item.color }}>
               {item.name}: {item.value}
             </p>

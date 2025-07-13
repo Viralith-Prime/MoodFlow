@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { ArrowPathIcon, MapIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { useOptimizedConfig } from '../utils/deviceCapabilities';
+import { preloadComponents } from '../utils/componentPreloader';
 
 // Loading fallback component
 const LoadingFallback: React.FC<{ 
@@ -177,37 +178,3 @@ export const OptimizedCommunity: React.FC = () => {
   );
 };
 
-// Preload components for high-performance devices
-export const preloadComponents = (): void => {
-  try {
-    // Get config outside of the function to avoid hook rules
-    const config = (() => {
-      try {
-        return useOptimizedConfig();
-      } catch {
-        return {
-          performanceConfig: { enablePrefetching: false }
-        };
-      }
-    })();
-    
-    if (config.performanceConfig.enablePrefetching) {
-      // Preload critical components
-      Promise.all([
-        import('./MoodMap'),
-        import('./pages/MoodLogging'),
-      ]).catch(err => console.warn('Component preload failed:', err));
-      
-      // Preload secondary components after a delay
-      setTimeout(() => {
-        Promise.all([
-          import('./pages/Analytics'),
-          import('./pages/Settings'),
-          import('./pages/Community'),
-        ]).catch(err => console.warn('Secondary component preload failed:', err));
-      }, 2000);
-    }
-  } catch (error) {
-    console.warn('Preload setup failed:', error);
-  }
-};

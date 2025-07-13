@@ -477,18 +477,34 @@ class StorageAdapter {
   // Health check
   async healthCheck() {
     try {
-      // Test database connection
-      await sql`SELECT 1`;
+      let databaseStatus = 'disconnected';
+      let databaseHealthy = false;
+      
+      // Test database connection if available
+      if (sql && this.config.enablePersistence) {
+        try {
+          await sql`SELECT 1`;
+          databaseStatus = 'connected';
+          databaseHealthy = true;
+        } catch (dbError) {
+          console.warn('Database connection failed:', dbError.message);
+          databaseStatus = 'failed';
+        }
+      } else {
+        databaseStatus = 'not_configured';
+      }
       
       // Test custom storage
       const customHealth = await customStorage.healthCheck();
       
       return {
-        healthy: true,
-        database: 'connected',
+        healthy: customHealth.healthy && (databaseStatus === 'connected' || databaseStatus === 'not_configured'),
+        database: databaseStatus,
+        databaseHealthy,
         customStorage: customHealth.healthy,
         cacheSize: this.cache.size,
         syncQueueSize: this.syncQueue.length,
+        persistenceEnabled: this.config.enablePersistence,
         timestamp: Date.now()
       };
     } catch (error) {
