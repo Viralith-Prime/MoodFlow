@@ -1,316 +1,191 @@
-import type { MoodEntry, UserSettings } from '../types';
 import { authService } from './authService';
 
-// Generate a simple user ID for anonymous users (stored in localStorage)
-function getUserId(): string {
-  // If authenticated, use the authenticated user's ID
-  if (authService.isAuthenticated()) {
-    const user = authService.getUser();
-    return user?.id || 'anonymous';
-  }
-  
-  // Otherwise, use anonymous ID
-  let userId = localStorage.getItem('moodflow-user-id');
-  if (!userId) {
-    userId = crypto.randomUUID();
-    localStorage.setItem('moodflow-user-id', userId);
-  }
-  return userId;
-}
-
-// Check if we're in development or production
-const API_BASE = import.meta.env.PROD 
-  ? '/api' 
-  : 'http://localhost:3000/api';
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
+// Simple API service for anonymous users
 class ApiService {
-  private userId: string;
-  private isOnline: boolean = navigator.onLine;
+  private baseUrl: string;
 
   constructor() {
-    this.userId = getUserId();
-    
-    // Listen for online/offline events
-    window.addEventListener('online', () => {
-      this.isOnline = true;
-      this.syncData();
-    });
-    
-    window.addEventListener('offline', () => {
-      this.isOnline = false;
-    });
-
-    // Listen for auth changes
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'moodflow-auth-token' || e.key === 'moodflow-auth-user') {
-        this.userId = getUserId();
-      }
-    });
+    this.baseUrl = import.meta.env.PROD ? '/api' : 'http://localhost:3000/api';
   }
 
-  private getHeaders(): HeadersInit {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-
-    // Add authentication header if available
-    const token = authService.getToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    return headers;
+  // Simple user ID generation
+  private getUserId(): string {
+    return authService.getUserId();
   }
 
-  private getStorageKey(type: 'moods' | 'settings'): string {
-    // Use authenticated storage keys for logged-in users
-    if (authService.isAuthenticated()) {
-      const user = authService.getUser();
-      return `moodflow-${type}-${user?.id}`;
-    }
-    // Use anonymous storage keys
-    return `moodflow-${type}`;
-  }
-
-  // Mood API methods
-  async getMoods(): Promise<ApiResponse<MoodEntry[]>> {
+  // Get moods for the current user
+  async getMoods(page = 1, limit = 50): Promise<any> {
     try {
-      const storageKey = this.getStorageKey('moods');
-      
-      if (!this.isOnline) {
-        // Fallback to localStorage when offline
-        const localMoods = localStorage.getItem(storageKey);
-        const moods = localMoods ? JSON.parse(localMoods).map((mood: Record<string, unknown>) => ({
-          ...mood,
-          timestamp: new Date(mood.timestamp as string)
-        })) : [];
-        return { success: true, data: moods };
-      }
-
-      const url = `${API_BASE}/moods`;
-
-      const response = await fetch(url, {
+      const userId = this.getUserId();
+      const response = await fetch(`${this.baseUrl}/moods?page=${page}&limit=${limit}`, {
         method: 'GET',
-        headers: this.getHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
-      
-      if (!response.ok) throw new Error('Failed to fetch moods');
-      
-      const result = await response.json();
-      
-      // Update localStorage with server data
-      const moods = result.moods.map((mood: Record<string, unknown>) => ({
-        ...mood,
-        timestamp: new Date(mood.timestamp as string)
-      }));
-      localStorage.setItem(storageKey, JSON.stringify(moods));
-      
-      return { success: true, data: moods };
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
     } catch (error) {
-      console.error('Error fetching moods:', error);
-      
-      // Fallback to localStorage on error
-      const storageKey = this.getStorageKey('moods');
-      const localMoods = localStorage.getItem(storageKey);
-      const moods = localMoods ? JSON.parse(localMoods).map((mood: Record<string, unknown>) => ({
-        ...mood,
-        timestamp: new Date(mood.timestamp as string)
-      })) : [];
-      
-      return { success: false, data: moods, error: 'Using offline data' };
+      console.error('Failed to fetch moods:', error);
+      return { success: false, error: 'Failed to fetch moods' };
     }
   }
 
-  async createMood(moodData: Omit<MoodEntry, 'id' | 'timestamp'>): Promise<ApiResponse<MoodEntry>> {
+  // Add a new mood
+  async addMood(moodData: any): Promise<any> {
     try {
-      const storageKey = this.getStorageKey('moods');
-      
-      // Always add to localStorage first (offline-first)
-      const newMood: MoodEntry = {
-        id: crypto.randomUUID(),
-        ...moodData,
-        timestamp: new Date()
-      };
+      const response = await fetch(`${this.baseUrl}/moods`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(moodData),
+      });
 
-      const localMoods = localStorage.getItem(storageKey);
-      const moods = localMoods ? JSON.parse(localMoods) as MoodEntry[] : [];
-      moods.unshift(newMood);
-      localStorage.setItem(storageKey, JSON.stringify(moods));
-
-      // Try to sync to server if online
-      if (this.isOnline) {
-        try {
-          const url = `${API_BASE}/moods`;
-
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify(moodData)
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            // Update localStorage with server-generated ID if different
-            if (result.mood.id !== newMood.id) {
-              const updatedMoods = moods.map((mood: MoodEntry) => 
-                mood.id === newMood.id ? result.mood : mood
-              );
-              localStorage.setItem(storageKey, JSON.stringify(updatedMoods));
-              return { success: true, data: result.mood };
-            }
-          }
-        } catch (syncError) {
-          console.warn('Failed to sync mood to server:', syncError);
-          // Mark for later sync
-          this.markForSync('mood', newMood);
-        }
-      } else {
-        // Mark for later sync when online
-        this.markForSync('mood', newMood);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return { success: true, data: newMood };
+      return await response.json();
     } catch (error) {
-      console.error('Error creating mood:', error);
-      return { success: false, error: 'Failed to create mood' };
+      console.error('Failed to add mood:', error);
+      return { success: false, error: 'Failed to add mood' };
     }
   }
 
-  // Settings API methods
-  async getSettings(): Promise<ApiResponse<UserSettings>> {
+  // Update a mood
+  async updateMood(moodId: string, moodData: any): Promise<any> {
     try {
-      const storageKey = this.getStorageKey('settings');
-      
-      if (!this.isOnline) {
-        // Fallback to localStorage when offline
-        const localSettings = localStorage.getItem(storageKey);
-        const settings = localSettings ? JSON.parse(localSettings) : {};
-        return { success: true, data: settings };
+      const response = await fetch(`${this.baseUrl}/moods?id=${moodId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(moodData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const url = authService.isAuthenticated() 
-        ? `${API_BASE}/settings`
-        : `${API_BASE}/settings?userId=${this.userId}`;
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to update mood:', error);
+      return { success: false, error: 'Failed to update mood' };
+    }
+  }
 
-      const response = await fetch(url, {
+  // Delete a mood
+  async deleteMood(moodId: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseUrl}/moods?id=${moodId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to delete mood:', error);
+      return { success: false, error: 'Failed to delete mood' };
+    }
+  }
+
+  // Get user settings
+  async getSettings(): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseUrl}/settings`, {
         method: 'GET',
-        headers: this.getHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
-      
-      if (!response.ok) throw new Error('Failed to fetch settings');
-      
-      const result = await response.json();
-      
-      // Update localStorage with server data
-      localStorage.setItem(storageKey, JSON.stringify(result.settings));
-      
-      return { success: true, data: result.settings };
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
     } catch (error) {
-      console.error('Error fetching settings:', error);
-      
-      // Fallback to localStorage on error
-      const storageKey = this.getStorageKey('settings');
-      const localSettings = localStorage.getItem(storageKey);
-      const settings = localSettings ? JSON.parse(localSettings) : {};
-      
-      return { success: false, data: settings, error: 'Using offline data' };
+      console.error('Failed to fetch settings:', error);
+      return { success: false, error: 'Failed to fetch settings' };
     }
   }
 
-  async updateSettings(settingsData: Partial<UserSettings>): Promise<ApiResponse<UserSettings>> {
+  // Update user settings
+  async updateSettings(settings: any): Promise<any> {
     try {
-      const storageKey = this.getStorageKey('settings');
-      
-      // Always update localStorage first (offline-first)
-      const existingSettings = localStorage.getItem(storageKey);
-      const currentSettings = existingSettings ? JSON.parse(existingSettings) : {};
-      const updatedSettings = { ...currentSettings, ...settingsData };
-      localStorage.setItem(storageKey, JSON.stringify(updatedSettings));
+      const response = await fetch(`${this.baseUrl}/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
 
-      // Try to sync to server if online
-      if (this.isOnline) {
-        try {
-          const url = authService.isAuthenticated() 
-            ? `${API_BASE}/settings`
-            : `${API_BASE}/settings?userId=${this.userId}`;
-
-          const response = await fetch(url, {
-            method: 'PUT',
-            headers: this.getHeaders(),
-            body: JSON.stringify(settingsData)
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            localStorage.setItem(storageKey, JSON.stringify(result.settings));
-            return { success: true, data: result.settings };
-          }
-        } catch (syncError) {
-          console.warn('Failed to sync settings to server:', syncError);
-          this.markForSync('settings', updatedSettings);
-        }
-      } else {
-        this.markForSync('settings', updatedSettings);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return { success: true, data: updatedSettings };
+      return await response.json();
     } catch (error) {
-      console.error('Error updating settings:', error);
+      console.error('Failed to update settings:', error);
       return { success: false, error: 'Failed to update settings' };
     }
   }
 
-  // Sync management
-  private markForSync(type: 'mood' | 'settings', data: MoodEntry | UserSettings) {
-    const syncQueue = JSON.parse(localStorage.getItem('moodflow-sync-queue') || '[]');
-    syncQueue.push({ type, data, timestamp: Date.now() });
-    localStorage.setItem('moodflow-sync-queue', JSON.stringify(syncQueue));
-  }
-
-  async syncData(): Promise<void> {
-    if (!this.isOnline) return;
-
+  // Health check
+  async healthCheck(): Promise<any> {
     try {
-      const syncQueue = JSON.parse(localStorage.getItem('moodflow-sync-queue') || '[]');
-      
-      for (const item of syncQueue) {
-        try {
-          if (item.type === 'mood') {
-            await this.createMood(item.data);
-          } else if (item.type === 'settings') {
-            await this.updateSettings(item.data);
-          }
-        } catch (error) {
-          console.warn('Failed to sync item:', error);
-          break; // Stop syncing on first failure
-        }
+      const response = await fetch(`${this.baseUrl}/health`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Clear sync queue on successful sync
-      localStorage.removeItem('moodflow-sync-queue');
-      console.log('✅ Data synced successfully');
+      return await response.json();
     } catch (error) {
-      console.error('Error during sync:', error);
+      console.error('Health check failed:', error);
+      return { success: false, error: 'Health check failed' };
     }
   }
 
-  // Check sync status
-  getPendingSyncCount(): number {
-    const syncQueue = JSON.parse(localStorage.getItem('moodflow-sync-queue') || '[]');
-    return syncQueue.length;
-  }
+  // Get storage stats
+  async getStorageStats(): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseUrl}/storage/stats`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-  isOffline(): boolean {
-    return !this.isOnline;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to get storage stats:', error);
+      return { success: false, error: 'Failed to get storage stats' };
+    }
   }
 }
 
-// Export singleton instance
+// Create and export singleton instance
 export const apiService = new ApiService();
 export default apiService;

@@ -1,37 +1,38 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { resolve } from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src'),
+    },
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,
-    chunkSizeWarningLimit: 800,
+    chunkSizeWarningLimit: 1000,
     minify: 'terser',
     rollupOptions: {
       output: {
         // Improved chunking strategy for optimal caching
         manualChunks: (id) => {
-          // Vendor chunks - stable, cacheable
-          if (id.includes('node_modules')) {
-            if (id.includes('react')) return 'react-vendor';
-            if (id.includes('leaflet')) return 'maps-vendor';
-            if (id.includes('recharts') || id.includes('d3')) return 'charts-vendor';
-            if (id.includes('@heroicons') || id.includes('lucide')) return 'icons-vendor';
-            if (id.includes('@headlessui')) return 'ui-vendor';
-            if (id.includes('bcryptjs') || id.includes('jose') || id.includes('zod')) return 'auth-vendor';
-            return 'vendor';
-          }
+          // Vendor chunk for React and related libraries
+          if (id.includes('react') || id.includes('react-dom')) return 'react-vendor';
           
-          // Feature-based chunks - lazy loaded
-          if (id.includes('components/pages/Analytics')) return 'analytics-page';
-          if (id.includes('components/pages/Settings')) return 'settings-page';
-          if (id.includes('components/pages/Community')) return 'community-page';
-          if (id.includes('components/pages/MoodLogging')) return 'logging-page';
-          if (id.includes('components/MoodMap')) return 'map-page';
-          if (id.includes('services/')) return 'services';
-          if (id.includes('utils/')) return 'utils';
+          // Vendor chunk for UI libraries
+          if (id.includes('@headlessui') || id.includes('@heroicons') || id.includes('lucide-react')) return 'ui-vendor';
+          
+          // Vendor chunk for charting libraries
+          if (id.includes('recharts') || id.includes('d3')) return 'charts-vendor';
+          
+          // Vendor chunk for mapping libraries
+          if (id.includes('leaflet')) return 'maps-vendor';
+          
+          // Vendor chunk for utility libraries
+          if (id.includes('uuid') || id.includes('zod')) return 'utils-vendor';
         },
         // Optimize file naming for caching
         entryFileNames: 'assets/[name]-[hash].js',
@@ -49,10 +50,16 @@ export default defineConfig({
     assetsInlineLimit: 4096,
   },
   server: {
-    port: 5173,
+    port: 3000,
     host: true,
     // Enable compression
     middlewareMode: false,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     port: 4173,

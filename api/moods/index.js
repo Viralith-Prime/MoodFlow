@@ -1,6 +1,4 @@
 import { storageAdapter } from '../storage/StorageAdapter.js';
-import { authEngine } from '../auth/CustomAuthEngine.js';
-import { jwtVerify } from 'jose';
 import { z } from 'zod';
 
 // Comprehensive error handling wrapper
@@ -43,52 +41,11 @@ const checkRateLimit = (identifier, limit = 100, window = 15 * 60 * 1000) => {
   return true;
 };
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'moodflow-super-secure-jwt-key-production-2024'
-);
-
-// Enhanced JWT verification with retry logic
-async function getUserFromToken(request) {
-  const authHeader = request.headers.authorization || request.headers.Authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.slice(7);
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    if (!payload || !payload.userId) {
-      return null;
-    }
-
-    // Get user with retry logic
-    let retryCount = 0;
-    const maxRetries = 3;
-    let user;
-
-    while (retryCount < maxRetries) {
-      try {
-        user = await storageAdapter.get(`user:${payload.userId}`);
-        break;
-      } catch (error) {
-        retryCount++;
-        if (retryCount >= maxRetries) {
-          console.error('Failed to get user from token after retries:', error);
-          return null;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100 * retryCount));
-      }
-    }
-
-    return user;
-  } catch (error) {
-    console.error('JWT verification error:', error);
-    return null;
-  }
+// Simple user ID generation for anonymous users
+function getUserId(req) {
+  // Use IP address as user identifier for anonymous users
+  const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'anonymous';
+  return `user_${clientIP.replace(/[^a-zA-Z0-9]/g, '_')}`;
 }
 
 // Validation schemas
@@ -129,14 +86,11 @@ const updateMoodSchema = z.object({
 
 const handler = async (req, res) => {
   try {
-    // Authentication check
-    const user = await getUserFromToken(req);
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized - Valid authentication required' });
-    }
+    // Get user ID (anonymous for now)
+    const userId = getUserId(req);
 
     // Rate limiting per user
-    if (!checkRateLimit(`moods:${user.id}`, 100, 15 * 60 * 1000)) {
+    if (!checkRateLimit(`moods:${userId}`, 100, 15 * 60 * 1000)) {
       return res.status(429).json({ 
         error: 'Too many requests. Please try again in 15 minutes.' 
       });
@@ -157,7 +111,7 @@ const handler = async (req, res) => {
 
       while (retryCount < maxRetries) {
         try {
-          userMoods = await storageAdapter.get(`moods:${user.id}`) || [];
+          userMoods = await storageAdapter.get(`moods:${userId}`) || [];
           break;
         } catch (error) {
           retryCount++;
@@ -187,7 +141,7 @@ const handler = async (req, res) => {
       const totalMoods = userMoods.length;
       const totalPages = Math.ceil(totalMoods / limit);
 
-      console.log(`📊 Retrieved ${paginatedMoods.length} moods for user ${user.id} (page ${page}/${totalPages})`);
+      console.log(`📊 Retrieved ${paginatedMoods.length} moods for user ${userId} (page ${page}/${totalPages})`);
 
       return res.status(200).json({ 
         success: true,
@@ -228,7 +182,7 @@ const handler = async (req, res) => {
         notes: notes || '',
         location: location || null,
         timestamp: timestamp || new Date().toISOString(),
-        userId: user.id,
+        userId: userId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -239,7 +193,7 @@ const handler = async (req, res) => {
 
       while (retryCount < maxRetries) {
         try {
-          userMoods = await storage.get(`moods:${user.id}`) || [];
+          userMoods = await storageAdapter.get(`moods:${userId}`) || [];
           break;
         } catch (error) {
           retryCount++;
@@ -262,7 +216,7 @@ const handler = async (req, res) => {
       retryCount = 0;
       while (retryCount < maxRetries) {
         try {
-          await storageAdapter.set(`moods:${user.id}`, userMoods);
+          await storageAdapter.set(`moods:${userId}`, userMoods);
           break;
         } catch (error) {
           retryCount++;
@@ -273,7 +227,7 @@ const handler = async (req, res) => {
         }
       }
 
-      console.log(`✅ Mood logged successfully for user ${user.id}: ${mood}`);
+      console.log(`✅ Mood logged successfully for user ${userId}: ${mood}`);
 
       return res.status(201).json({ 
         success: true,
@@ -311,7 +265,7 @@ const handler = async (req, res) => {
 
       while (retryCount < maxRetries) {
         try {
-          userMoods = await storageAdapter.get(`moods:${user.id}`) || [];
+          userMoods = await storageAdapter.get(`moods:${userId}`) || [];
           break;
         } catch (error) {
           retryCount++;
@@ -340,7 +294,7 @@ const handler = async (req, res) => {
       retryCount = 0;
       while (retryCount < maxRetries) {
         try {
-          await storageAdapter.set(`moods:${user.id}`, userMoods);
+          await storageAdapter.set(`moods:${userId}`, userMoods);
           break;
         } catch (error) {
           retryCount++;
@@ -351,7 +305,7 @@ const handler = async (req, res) => {
         }
       }
 
-      console.log(`📝 Mood updated successfully for user ${user.id}: ${moodId}`);
+      console.log(`📝 Mood updated successfully for user ${userId}: ${moodId}`);
 
       return res.status(200).json({ 
         success: true,
@@ -373,7 +327,7 @@ const handler = async (req, res) => {
 
       while (retryCount < maxRetries) {
         try {
-          userMoods = await storageAdapter.get(`moods:${user.id}`) || [];
+          userMoods = await storageAdapter.get(`moods:${userId}`) || [];
           break;
         } catch (error) {
           retryCount++;
@@ -397,7 +351,7 @@ const handler = async (req, res) => {
       retryCount = 0;
       while (retryCount < maxRetries) {
         try {
-          await storageAdapter.set(`moods:${user.id}`, userMoods);
+          await storageAdapter.set(`moods:${userId}`, userMoods);
           break;
         } catch (error) {
           retryCount++;
@@ -408,7 +362,7 @@ const handler = async (req, res) => {
         }
       }
 
-      console.log(`🗑️ Mood deleted successfully for user ${user.id}: ${moodId}`);
+      console.log(`🗑️ Mood deleted successfully for user ${userId}: ${moodId}`);
 
       return res.status(200).json({ 
         success: true,
@@ -432,7 +386,7 @@ const handler = async (req, res) => {
     
     if (error.message.includes('Failed to save mood') || error.message.includes('Failed to update mood') || error.message.includes('Failed to delete mood')) {
       return res.status(503).json({ 
-        error: 'Failed to save changes. Please try again.' 
+        error: 'Service temporarily unavailable. Please try again.' 
       });
     }
 

@@ -115,8 +115,6 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
   }
 };
 
-
-
 interface AppProviderProps {
   children: ReactNode;
 }
@@ -125,8 +123,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, {
     ...initialState,
     syncStatus: {
-      isOffline: apiService.isOffline(),
-      pendingSyncCount: apiService.getPendingSyncCount(),
+      isOffline: !navigator.onLine,
+      pendingSyncCount: 0,
     },
     auth: {
       user: authService.getUser(),
@@ -136,54 +134,33 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   });
 
-  // Load data from localStorage first, then try API sync
+  // Load data from API
   useEffect(() => {
     const loadInitialData = async () => {
       dispatch({ type: 'SET_LOADING', payload: true });
       
       try {
-        // Always load from localStorage first for instant app start
-        const savedMoods = localStorage.getItem('moodflow-moods');
-        const savedSettings = localStorage.getItem('moodflow-settings');
-        
-        const localMoods = savedMoods ? JSON.parse(savedMoods).map((mood: Record<string, unknown>) => ({
-          ...mood,
-          timestamp: new Date(mood.timestamp as string),
-        })) : [];
-        
-        const localSettings = savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
-        
-        // Load local data immediately
-        dispatch({ type: 'LOAD_DATA', payload: { moods: localMoods, settings: localSettings } });
-        
-        // Try to sync with API in background (non-blocking)
-        setTimeout(async () => {
-          try {
-            const [moodsResponse, settingsResponse] = await Promise.all([
-              apiService.getMoods(),
-              apiService.getSettings()
-            ]);
+        // Try to load from API
+        const [moodsResponse, settingsResponse] = await Promise.all([
+          apiService.getMoods(),
+          apiService.getSettings()
+        ]);
 
-            // Only update if API has newer data
-            if (moodsResponse.success && moodsResponse.data && moodsResponse.data.length > 0) {
-              const serverMoods = moodsResponse.data.map((mood: MoodEntry) => ({
-                ...mood,
-                timestamp: new Date(mood.timestamp),
-              }));
-              dispatch({ type: 'LOAD_DATA', payload: { 
-                moods: serverMoods, 
-                settings: settingsResponse.success ? { ...defaultSettings, ...settingsResponse.data } : localSettings 
-              }});
-            }
-          } catch (apiError) {
-            console.log('API sync failed, using local data:', apiError);
-            // This is fine - we already have local data loaded
-          }
-        }, 100);
+        const moods = moodsResponse.success && moodsResponse.moods 
+          ? moodsResponse.moods.map((mood: any) => ({
+              ...mood,
+              timestamp: new Date(mood.timestamp),
+            }))
+          : [];
 
-      } catch (localError) {
-        console.error('Error loading from localStorage:', localError);
-        // If even localStorage fails, load with defaults
+        const settings = settingsResponse.success && settingsResponse.settings
+          ? { ...defaultSettings, ...settingsResponse.settings }
+          : defaultSettings;
+
+        dispatch({ type: 'LOAD_DATA', payload: { moods, settings } });
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Load with defaults if API fails
         dispatch({ type: 'LOAD_DATA', payload: { moods: [], settings: defaultSettings } });
       }
     };
@@ -197,8 +174,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       dispatch({
         type: 'UPDATE_SYNC_STATUS',
         payload: {
-          isOffline: apiService.isOffline(),
-          pendingSyncCount: apiService.getPendingSyncCount(),
+          isOffline: !navigator.onLine,
+          pendingSyncCount: 0, // Simplified - no sync queue
           lastSyncTime: state.syncStatus?.lastSyncTime
         }
       });
@@ -214,42 +191,30 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     
     try {
-      const response = await apiService.createMood(moodData);
+      const response = await apiService.addMood(moodData);
       
-      if (response.success && response.data) {
-        dispatch({ type: 'ADD_MOOD', payload: response.data });
+      if (response.success && response.mood) {
+        const newMood: MoodEntry = {
+          ...response.mood,
+          timestamp: new Date(response.mood.timestamp),
+        };
+        dispatch({ type: 'ADD_MOOD', payload: newMood });
         
         // Update sync status
         dispatch({
           type: 'UPDATE_SYNC_STATUS',
           payload: {
-            isOffline: apiService.isOffline(),
-            pendingSyncCount: apiService.getPendingSyncCount(),
+            isOffline: !navigator.onLine,
+            pendingSyncCount: 0,
             lastSyncTime: new Date()
           }
         });
       } else {
-        // Even if API fails, the mood was still added to localStorage
-        const localMood: MoodEntry = {
-          id: uuidv4(),
-          ...moodData,
-          timestamp: new Date(),
-        };
-        dispatch({ type: 'ADD_MOOD', payload: localMood });
-        dispatch({ type: 'SET_ERROR', payload: 'Mood saved locally - will sync when online' });
-        setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 3000);
+        dispatch({ type: 'SET_ERROR', payload: response.error || 'Failed to add mood' });
       }
     } catch (error) {
       console.error('Error adding mood:', error);
-      // Still add locally even if API fails
-      const localMood: MoodEntry = {
-        id: uuidv4(),
-        ...moodData,
-        timestamp: new Date(),
-      };
-      dispatch({ type: 'ADD_MOOD', payload: localMood });
-      dispatch({ type: 'SET_ERROR', payload: 'Mood saved locally' });
-      setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 3000);
+      dispatch({ type: 'SET_ERROR', payload: 'Failed to add mood' });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -259,29 +224,24 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       const response = await apiService.updateSettings(settings);
       
-      if (response.success && response.data) {
-        dispatch({ type: 'UPDATE_SETTINGS', payload: response.data });
+      if (response.success && response.settings) {
+        dispatch({ type: 'UPDATE_SETTINGS', payload: response.settings });
         
         // Update sync status
         dispatch({
           type: 'UPDATE_SYNC_STATUS',
           payload: {
-            isOffline: apiService.isOffline(),
-            pendingSyncCount: apiService.getPendingSyncCount(),
+            isOffline: !navigator.onLine,
+            pendingSyncCount: 0,
             lastSyncTime: new Date()
           }
         });
       } else {
-        dispatch({ type: 'UPDATE_SETTINGS', payload: settings });
-        dispatch({ type: 'SET_ERROR', payload: 'Settings saved locally - will sync when online' });
-        setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 3000);
+        dispatch({ type: 'SET_ERROR', payload: response.error || 'Failed to update settings' });
       }
     } catch (error) {
       console.error('Error updating settings:', error);
-      // Still update locally even if API fails
-      dispatch({ type: 'UPDATE_SETTINGS', payload: settings });
-      dispatch({ type: 'SET_ERROR', payload: 'Settings saved locally' });
-      setTimeout(() => dispatch({ type: 'CLEAR_ERROR' }), 3000);
+      dispatch({ type: 'SET_ERROR', payload: 'Failed to update settings' });
     }
   };
 
@@ -303,28 +263,35 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const forceSync = async (): Promise<void> => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      await apiService.syncData();
       
-      // Reload data after sync
+      // Reload data from API
       const [moodsResponse, settingsResponse] = await Promise.all([
         apiService.getMoods(),
         apiService.getSettings()
       ]);
 
       if (moodsResponse.success && settingsResponse.success) {
+        const moods = moodsResponse.moods 
+          ? moodsResponse.moods.map((mood: any) => ({
+              ...mood,
+              timestamp: new Date(mood.timestamp),
+            }))
+          : [];
+
+        const settings = settingsResponse.settings
+          ? { ...defaultSettings, ...settingsResponse.settings }
+          : defaultSettings;
+
         dispatch({
           type: 'LOAD_DATA',
-          payload: {
-            moods: moodsResponse.data || [],
-            settings: { ...defaultSettings, ...settingsResponse.data }
-          }
+          payload: { moods, settings }
         });
         
         dispatch({
           type: 'UPDATE_SYNC_STATUS',
           payload: {
-            isOffline: apiService.isOffline(),
-            pendingSyncCount: apiService.getPendingSyncCount(),
+            isOffline: !navigator.onLine,
+            pendingSyncCount: 0,
             lastSyncTime: new Date()
           }
         });

@@ -1,440 +1,233 @@
-import type { User, LoginCredentials, RegisterCredentials, UpdateProfileData } from '../types';
+import type { User } from '../types';
 
-// Check if we're in development or production
-const API_BASE = import.meta.env.PROD 
-  ? '/api' 
-  : 'http://localhost:3000/api';
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
+/**
+ * Simple Authentication Service - No JWT, Anonymous Users
+ * Provides basic user management without complex authentication
+ */
 
 class AuthService {
-  private token: string | null = null;
   private user: User | null = null;
+  private isInitialized = false;
 
   constructor() {
-    // Load token from localStorage on initialization
-    this.token = localStorage.getItem('moodflow-auth-token');
-    const savedUser = localStorage.getItem('moodflow-auth-user');
-    if (savedUser) {
-      try {
-        this.user = JSON.parse(savedUser);
-      } catch (error) {
-        console.warn('Failed to parse saved user data:', error);
-        this.clearAuth();
-      }
+    this.init();
+  }
+
+  private init() {
+    if (this.isInitialized) return;
+    
+    // Generate anonymous user ID based on browser fingerprint
+    const anonymousId = this.generateAnonymousId();
+    
+    this.user = {
+      id: anonymousId,
+      email: '',
+      username: 'Anonymous User',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isVerified: false,
+      lastLogin: new Date().toISOString()
+    };
+    
+    this.isInitialized = true;
+    console.log('🔐 Simple auth service initialized');
+  }
+
+  private generateAnonymousId(): string {
+    // Create a simple anonymous ID based on browser characteristics
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx?.fillText('Anonymous', 0, 0);
+    
+    const fingerprint = [
+      navigator.userAgent,
+      navigator.language,
+      screen.width,
+      screen.height,
+      new Date().getTimezoneOffset()
+    ].join('|');
+    
+    // Simple hash function
+    let hash = 0;
+    for (let i = 0; i < fingerprint.length; i++) {
+      const char = fingerprint.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
     }
+    
+    return `anon_${Math.abs(hash).toString(36)}`;
   }
 
-  // Getters
-  getToken(): string | null {
-    return this.token;
-  }
-
+  // Get current user
   getUser(): User | null {
+    this.init();
     return this.user;
   }
 
+  // Check if user is authenticated (always true for anonymous users)
   isAuthenticated(): boolean {
-    return !!(this.token && this.user);
+    this.init();
+    return this.user !== null;
   }
 
-  // Private helper methods
-  private setAuth(user: User, token: string): void {
-    this.user = user;
-    this.token = token;
-    localStorage.setItem('moodflow-auth-user', JSON.stringify(user));
-    localStorage.setItem('moodflow-auth-token', token);
+  // Get user ID
+  getUserId(): string {
+    this.init();
+    return this.user?.id || 'anonymous';
   }
 
-  private clearAuth(): void {
-    this.user = null;
-    this.token = null;
-    localStorage.removeItem('moodflow-auth-user');
-    localStorage.removeItem('moodflow-auth-token');
+  // Get token (returns null for anonymous users)
+  getToken(): string | null {
+    return null; // No tokens for anonymous users
   }
 
-  private getAuthHeaders(): HeadersInit {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+  // Login (no-op for anonymous users)
+  async login(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
+    console.log('⚠️ Login not available in anonymous mode');
+    return {
+      success: false,
+      error: 'Login not available in anonymous mode'
     };
-    
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
-    
-    return headers;
   }
 
-  // Registration
-  async register(credentials: RegisterCredentials): Promise<ApiResponse<{ user: User; token: string }>> {
-    try {
-      const response = await fetch(`${API_BASE}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return {
-          success: false,
-          error: data.error || 'Registration failed',
-        };
-      }
-
-      // Store authentication data
-      this.setAuth(data.user, data.token);
-
-      return {
-        success: true,
-        data: {
-          user: data.user,
-          token: data.token,
-        },
-        message: data.message,
-      };
-    } catch (error) {
-      console.error('Registration error:', error);
-      return {
-        success: false,
-        error: 'Network error. Please check your connection.',
-      };
-    }
+  // Register (no-op for anonymous users)
+  async register(email: string, username: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
+    console.log('⚠️ Registration not available in anonymous mode');
+    return {
+      success: false,
+      error: 'Registration not available in anonymous mode'
+    };
   }
 
-  // Login
-  async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: User; token: string }>> {
-    try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return {
-          success: false,
-          error: data.error || 'Login failed',
-        };
-      }
-
-      // Store authentication data
-      this.setAuth(data.user, data.token);
-
-      return {
-        success: true,
-        data: {
-          user: data.user,
-          token: data.token,
-        },
-        message: data.message,
-      };
-    } catch (error) {
-      console.error('Login error:', error);
-      return {
-        success: false,
-        error: 'Network error. Please check your connection.',
-      };
-    }
+  // Logout (no-op for anonymous users)
+  async logout(): Promise<{ success: boolean }> {
+    console.log('⚠️ Logout not available in anonymous mode');
+    return { success: true };
   }
 
-  // Logout
-  async logout(): Promise<ApiResponse<null>> {
-    try {
-      // Call logout endpoint (mainly for server-side token invalidation if implemented)
-      if (this.token) {
-        await fetch(`${API_BASE}/auth/logout`, {
-          method: 'POST',
-          headers: this.getAuthHeaders(),
-        });
-      }
-
-      // Clear local authentication data
-      this.clearAuth();
-
-      return {
-        success: true,
-        message: 'Logged out successfully',
-      };
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Even if the API call fails, clear local data
-      this.clearAuth();
-      return {
-        success: true,
-        message: 'Logged out successfully',
-      };
-    }
+  // Verify token (always returns false for anonymous users)
+  async verifyToken(token: string): Promise<{ success: boolean; user?: User; error?: string }> {
+    return {
+      success: false,
+      error: 'Token verification not available in anonymous mode'
+    };
   }
 
-  // Verify token and get current user
-  async verifyToken(): Promise<ApiResponse<{ user: User | null; authenticated: boolean }>> {
-    if (!this.token) {
-      return {
-        success: true,
-        data: { user: null, authenticated: false },
-      };
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/auth/verify`, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.authenticated) {
-        // Token is invalid, clear auth data
-        this.clearAuth();
-        return {
-          success: true,
-          data: { user: null, authenticated: false },
-        };
-      }
-
-      // Update user data if it exists
-      if (data.user) {
-        this.user = { ...this.user, ...data.user };
-        localStorage.setItem('moodflow-auth-user', JSON.stringify(this.user));
-      }
-
-      return {
-        success: true,
-        data: {
-          user: this.user,
-          authenticated: true,
-        },
-      };
-    } catch (error) {
-      console.error('Token verification error:', error);
-      // On network error, don't clear token (might be temporary)
+  // Update user profile (limited for anonymous users)
+  async updateProfile(updates: Partial<User>): Promise<{ success: boolean; user?: User; error?: string }> {
+    if (!this.user) {
       return {
         success: false,
-        error: 'Failed to verify authentication',
-        data: { user: this.user, authenticated: !!this.token },
-      };
-    }
-  }
-
-  // Get user profile
-  async getProfile(): Promise<ApiResponse<User>> {
-    if (!this.token) {
-      return {
-        success: false,
-        error: 'Not authenticated',
+        error: 'No user found'
       };
     }
 
-    try {
-      const response = await fetch(`${API_BASE}/auth/profile`, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          this.clearAuth();
-        }
-        return {
-          success: false,
-          error: data.error || 'Failed to get profile',
-        };
-      }
-
-      // Update local user data
-      this.user = data.user;
-      localStorage.setItem('moodflow-auth-user', JSON.stringify(this.user));
-
-      return {
-        success: true,
-        data: data.user,
-      };
-    } catch (error) {
-      console.error('Get profile error:', error);
-      return {
-        success: false,
-        error: 'Network error. Please check your connection.',
-      };
-    }
-  }
-
-  // Update user profile
-  async updateProfile(profileData: UpdateProfileData): Promise<ApiResponse<User>> {
-    if (!this.token) {
-      return {
-        success: false,
-        error: 'Not authenticated',
-      };
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/auth/profile`, {
-        method: 'PUT',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(profileData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          this.clearAuth();
-        }
-        return {
-          success: false,
-          error: data.error || 'Failed to update profile',
-        };
-      }
-
-      // Update local user data
-      this.user = data.user;
-      localStorage.setItem('moodflow-auth-user', JSON.stringify(this.user));
-
-      return {
-        success: true,
-        data: data.user,
-        message: data.message,
-      };
-    } catch (error) {
-      console.error('Update profile error:', error);
-      return {
-        success: false,
-        error: 'Network error. Please check your connection.',
-      };
-    }
-  }
-
-  // Delete account
-  async deleteAccount(password: string): Promise<ApiResponse<null>> {
-    if (!this.token) {
-      return {
-        success: false,
-        error: 'Not authenticated',
-      };
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/auth/delete-account`, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return {
-          success: false,
-          error: data.error || 'Failed to delete account',
-        };
-      }
-
-      // Clear local authentication data
-      this.clearAuth();
-
-      return {
-        success: true,
-        message: data.message,
-      };
-    } catch (error) {
-      console.error('Delete account error:', error);
-      return {
-        success: false,
-        error: 'Network error. Please check your connection.',
-      };
-    }
-  }
-
-  // Migrate anonymous data to authenticated account
-  async migrateAnonymousData(): Promise<ApiResponse<null>> {
-    if (!this.isAuthenticated()) {
-      return {
-        success: false,
-        error: 'Not authenticated',
-      };
-    }
-
-    try {
-      // Get anonymous data from localStorage
-      const anonymousMoods = localStorage.getItem('moodflow-moods');
-      const anonymousSettings = localStorage.getItem('moodflow-settings');
-
-      if (!anonymousMoods && !anonymousSettings) {
-        return {
-          success: true,
-          message: 'No anonymous data to migrate',
-        };
-      }
-
-      // Send migration request
-      const response = await fetch(`${API_BASE}/auth/migrate-data`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({
-          moods: anonymousMoods ? JSON.parse(anonymousMoods) : [],
-          settings: anonymousSettings ? JSON.parse(anonymousSettings) : {},
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        return {
-          success: false,
-          error: data.error || 'Failed to migrate data',
-        };
-      }
-
-      // Clear anonymous data after successful migration
-      localStorage.removeItem('moodflow-moods');
-      localStorage.removeItem('moodflow-settings');
-
-      return {
-        success: true,
-        message: 'Data migrated successfully',
-      };
-    } catch (error) {
-      console.error('Data migration error:', error);
-      return {
-        success: false,
-        error: 'Failed to migrate data',
-      };
-    }
-  }
-
-  // Check if user has anonymous data to migrate
-  hasAnonymousDataToMigrate(): boolean {
-    const anonymousMoods = localStorage.getItem('moodflow-moods');
-    
-    if (anonymousMoods) {
+    // Only allow updating username for anonymous users
+    if (updates.username && typeof updates.username === 'string') {
+      this.user.username = updates.username;
+      this.user.updatedAt = new Date().toISOString();
+      
+      // Save to localStorage for persistence
       try {
-        const moods = JSON.parse(anonymousMoods);
-        if (Array.isArray(moods) && moods.length > 0) {
-          return true;
-        }
+        localStorage.setItem('moodflow_anonymous_user', JSON.stringify(this.user));
       } catch (error) {
-        console.warn('Failed to parse anonymous moods:', error);
+        console.warn('Failed to save user to localStorage:', error);
       }
+      
+      return {
+        success: true,
+        user: this.user
+      };
     }
 
-    return false;
+    return {
+      success: false,
+      error: 'Only username can be updated for anonymous users'
+    };
+  }
+
+  // Get user settings (returns default settings)
+  async getUserSettings(): Promise<any> {
+    return {
+      theme: 'light',
+      notifications: true,
+      privacy: 'private',
+      language: 'en',
+      timezone: 'UTC',
+      moodReminders: true,
+      reminderFrequency: 'daily',
+      dataExport: false,
+      shareLocation: false,
+      analyticsEnabled: true
+    };
+  }
+
+  // Update user settings
+  async updateUserSettings(settings: any): Promise<{ success: boolean; settings?: any; error?: string }> {
+    // For anonymous users, we'll just return success
+    // Settings will be handled by the settings API
+    return {
+      success: true,
+      settings
+    };
+  }
+
+  // Check if user can perform actions (always true for anonymous users)
+  canPerformAction(action: string): boolean {
+    return true; // Anonymous users can perform all basic actions
+  }
+
+  // Get user permissions (basic permissions for anonymous users)
+  getUserPermissions(): string[] {
+    return [
+      'read_moods',
+      'write_moods',
+      'read_settings',
+      'write_settings'
+    ];
+  }
+
+  // Health check
+  async healthCheck(): Promise<{ healthy: boolean; details?: any }> {
+    return {
+      healthy: this.isInitialized && this.user !== null,
+      details: {
+        isInitialized: this.isInitialized,
+        hasUser: this.user !== null,
+        userId: this.user?.id,
+        mode: 'anonymous'
+      }
+    };
+  }
+
+  // Clear all data (for testing)
+  clearData(): void {
+    this.user = null;
+    this.isInitialized = false;
+    
+    try {
+      localStorage.removeItem('moodflow_anonymous_user');
+    } catch (error) {
+      console.warn('Failed to clear localStorage:', error);
+    }
+  }
+
+  // Load user from localStorage (for persistence)
+  private loadFromStorage(): void {
+    try {
+      const stored = localStorage.getItem('moodflow_anonymous_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id) {
+          this.user = parsed;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load user from localStorage:', error);
+    }
   }
 }
 
-// Export singleton instance
+// Create and export singleton instance
 export const authService = new AuthService();
 export default authService;
