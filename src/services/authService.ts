@@ -17,14 +17,12 @@ class AuthService {
   private user: User | null = null;
 
   constructor() {
-    // Load token from localStorage on initialization
     this.token = localStorage.getItem('moodflow-auth-token');
     const savedUser = localStorage.getItem('moodflow-auth-user');
     if (savedUser) {
       try {
         this.user = JSON.parse(savedUser);
       } catch (error) {
-        console.warn('Failed to parse saved user data:', error);
         this.clearAuth();
       }
     }
@@ -90,7 +88,6 @@ class AuthService {
         };
       }
 
-      // Store authentication data
       this.setAuth(data.user, data.token);
 
       return {
@@ -102,7 +99,6 @@ class AuthService {
         message: data.message,
       };
     } catch (error) {
-      console.error('Registration error:', error);
       return {
         success: false,
         error: 'Network error. Please check your connection.',
@@ -130,7 +126,6 @@ class AuthService {
         };
       }
 
-      // Store authentication data
       this.setAuth(data.user, data.token);
 
       return {
@@ -142,7 +137,6 @@ class AuthService {
         message: data.message,
       };
     } catch (error) {
-      console.error('Login error:', error);
       return {
         success: false,
         error: 'Network error. Please check your connection.',
@@ -153,7 +147,6 @@ class AuthService {
   // Logout
   async logout(): Promise<ApiResponse<null>> {
     try {
-      // Call logout endpoint (mainly for server-side token invalidation if implemented)
       if (this.token) {
         await fetch(`${API_BASE}/auth/logout`, {
           method: 'POST',
@@ -161,7 +154,6 @@ class AuthService {
         });
       }
 
-      // Clear local authentication data
       this.clearAuth();
 
       return {
@@ -169,8 +161,6 @@ class AuthService {
         message: 'Logged out successfully',
       };
     } catch (error) {
-      console.error('Logout error:', error);
-      // Even if the API call fails, clear local data
       this.clearAuth();
       return {
         success: true,
@@ -197,7 +187,6 @@ class AuthService {
       const data = await response.json();
 
       if (!response.ok || !data.authenticated) {
-        // Token is invalid, clear auth data
         this.clearAuth();
         return {
           success: true,
@@ -205,7 +194,6 @@ class AuthService {
         };
       }
 
-      // Update user data if it exists
       if (data.user) {
         this.user = { ...this.user, ...data.user };
         localStorage.setItem('moodflow-auth-user', JSON.stringify(this.user));
@@ -219,8 +207,6 @@ class AuthService {
         },
       };
     } catch (error) {
-      console.error('Token verification error:', error);
-      // On network error, don't clear token (might be temporary)
       return {
         success: false,
         error: 'Failed to verify authentication',
@@ -256,7 +242,6 @@ class AuthService {
         };
       }
 
-      // Update local user data
       this.user = data.user;
       localStorage.setItem('moodflow-auth-user', JSON.stringify(this.user));
 
@@ -265,7 +250,6 @@ class AuthService {
         data: data.user,
       };
     } catch (error) {
-      console.error('Get profile error:', error);
       return {
         success: false,
         error: 'Network error. Please check your connection.',
@@ -301,7 +285,6 @@ class AuthService {
         };
       }
 
-      // Update local user data
       this.user = data.user;
       localStorage.setItem('moodflow-auth-user', JSON.stringify(this.user));
 
@@ -311,7 +294,6 @@ class AuthService {
         message: data.message,
       };
     } catch (error) {
-      console.error('Update profile error:', error);
       return {
         success: false,
         error: 'Network error. Please check your connection.',
@@ -344,7 +326,6 @@ class AuthService {
         };
       }
 
-      // Clear local authentication data
       this.clearAuth();
 
       return {
@@ -352,7 +333,6 @@ class AuthService {
         message: data.message,
       };
     } catch (error) {
-      console.error('Delete account error:', error);
       return {
         success: false,
         error: 'Network error. Please check your connection.',
@@ -370,7 +350,6 @@ class AuthService {
     }
 
     try {
-      // Get anonymous data from localStorage
       const anonymousMoods = localStorage.getItem('moodflow-moods');
       const anonymousSettings = localStorage.getItem('moodflow-settings');
 
@@ -381,7 +360,6 @@ class AuthService {
         };
       }
 
-      // Send migration request
       const response = await fetch(`${API_BASE}/auth/migrate-data`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
@@ -399,7 +377,6 @@ class AuthService {
         };
       }
 
-      // Clear anonymous data after successful migration
       localStorage.removeItem('moodflow-moods');
       localStorage.removeItem('moodflow-settings');
 
@@ -408,7 +385,6 @@ class AuthService {
         message: 'Data migrated successfully',
       };
     } catch (error) {
-      console.error('Data migration error:', error);
       return {
         success: false,
         error: 'Failed to migrate data',
@@ -427,7 +403,7 @@ class AuthService {
           return true;
         }
       } catch (error) {
-        console.warn('Failed to parse anonymous moods:', error);
+        return false;
       }
     }
 

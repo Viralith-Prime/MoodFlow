@@ -6,38 +6,12 @@
   "installCommand": "npm install",
   "rewrites": [
     {
-      "source": "/api/auth/register",
-      "destination": "/api/auth/register.js"
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
     },
     {
-      "source": "/api/auth/login", 
-      "destination": "/api/auth/login.js"
-    },
-    {
-      "source": "/api/auth/verify",
-      "destination": "/api/auth/verify.js"
-    },
-    {
-      "source": "/api/auth/profile",
-      "destination": "/api/auth/profile.js"
-    },
-    {
-      "source": "/api/moods",
-      "destination": "/api/moods/index.js"
-    },
-    {
-      "source": "/api/settings",
-      "destination": "/api/settings/index.js"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
@@ -55,47 +29,8 @@
         {
           "key": "Access-Control-Allow-Headers",
           "value": "Content-Type, Authorization"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
-        }
-      ]
-    },
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
         }
       ]
     }
-  ],
-  "env": {
-    "NODE_ENV": "production",
-    "JWT_SECRET": "@jwt_secret"
-  },
-  "regions": ["iad1"]
+  ]
 }
