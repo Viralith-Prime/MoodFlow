@@ -95,7 +95,7 @@ export const Navigation: React.FC<NavigationProps> = ({ className = '' }) => {
         const isActive = state.currentTab === item.id;
         const IconComponent = isActive ? item.iconSolid : item.icon;
         
-        const buttonStyle = (item as any).disabled 
+        const buttonStyle = (item as { disabled?: boolean }).disabled 
           ? disabledButtonStyle
           : isActive 
             ? activeButtonStyle
@@ -104,17 +104,17 @@ export const Navigation: React.FC<NavigationProps> = ({ className = '' }) => {
         return (
           <button
             key={item.id}
-            onClick={() => handleTabClick(item.id, (item as any).disabled)}
-            disabled={(item as any).disabled}
+            onClick={() => handleTabClick(item.id, (item as { disabled?: boolean }).disabled)}
+            disabled={(item as { disabled?: boolean }).disabled}
             className={`nav-item ${isActive ? 'active' : ''} ${
-              (item as any).disabled ? 'opacity-50 cursor-not-allowed' : ''
+              (item as { disabled?: boolean }).disabled ? 'opacity-50 cursor-not-allowed' : ''
             } min-w-0 flex-1`}
             style={buttonStyle}
             aria-label={item.label}
           >
             <IconComponent style={iconStyle} />
             <span style={labelStyle}>{item.label}</span>
-            {(item as any).disabled && (
+            {(item as { disabled?: boolean }).disabled && (
               <span style={{ fontSize: '0.625rem', color: '#9ca3af' }}>
                 (Soon)
               </span>

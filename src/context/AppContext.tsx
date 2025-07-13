@@ -171,9 +171,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         const savedMoods = localStorage.getItem('moodflow-moods');
         const savedSettings = localStorage.getItem('moodflow-settings');
         
-        const localMoods = savedMoods ? JSON.parse(savedMoods).map((mood: any) => ({
+        const localMoods = savedMoods ? JSON.parse(savedMoods).map((mood: Record<string, unknown>) => ({
           ...mood,
-          timestamp: new Date(mood.timestamp),
+          timestamp: new Date(mood.timestamp as string),
         })) : [];
         
         const localSettings = savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
@@ -191,7 +191,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
             // Only update if API has newer data
             if (moodsResponse.success && moodsResponse.data && moodsResponse.data.length > 0) {
-              const serverMoods = moodsResponse.data.map((mood: any) => ({
+              const serverMoods = moodsResponse.data.map((mood: MoodEntry) => ({
                 ...mood,
                 timestamp: new Date(mood.timestamp),
               }));

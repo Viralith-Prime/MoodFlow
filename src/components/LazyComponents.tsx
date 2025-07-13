@@ -6,7 +6,7 @@ import { useOptimizedConfig } from '../utils/deviceCapabilities';
 const LoadingFallback: React.FC<{ 
   component: string; 
   height?: string;
-  icon?: React.ComponentType<any>;
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }> = ({ component, height = "h-full", icon: Icon = ArrowPathIcon }) => (
   <div className={`${height} flex items-center justify-center bg-gray-50`}>
     <div className="text-center">
@@ -178,9 +178,18 @@ export const OptimizedCommunity: React.FC = () => {
 };
 
 // Preload components for high-performance devices
-export const preloadComponents = () => {
+export const preloadComponents = (): void => {
   try {
-    const config = useOptimizedConfig();
+    // Get config outside of the function to avoid hook rules
+    const config = (() => {
+      try {
+        return useOptimizedConfig();
+      } catch {
+        return {
+          performanceConfig: { enablePrefetching: false }
+        };
+      }
+    })();
     
     if (config.performanceConfig.enablePrefetching) {
       // Preload critical components
