@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { AppProvider } from './context/AppContext';
 import { useApp } from './context/useApp';
 import { Navigation } from './components/Navigation';
@@ -9,28 +9,9 @@ import {
   OptimizedSettings,
   OptimizedCommunity
 } from './components/LazyComponents';
-import { preloadComponents } from './utils/componentPreloader';
-import { reportPerformanceMetrics } from './utils/deviceCapabilities';
 
 const AppContent: React.FC = () => {
   const { state } = useApp();
-
-  // Initialize performance monitoring and component preloading
-  useEffect(() => {
-    // Report initial performance metrics
-    try {
-      reportPerformanceMetrics();
-    } catch (error) {
-      console.warn('Performance metrics failed:', error);
-    }
-    
-    // Preload components for better performance
-    try {
-      preloadComponents();
-    } catch (error) {
-      console.warn('Component preloading failed:', error);
-    }
-  }, []);
 
   const renderCurrentPage = () => {
     switch (state.currentTab) {
