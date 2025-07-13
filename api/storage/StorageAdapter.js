@@ -17,6 +17,20 @@ import { storage as customStorage } from './index.js';
 // Optional Postgres import - will be undefined if not available
 let sql = null;
 
+// Try to import Postgres, but don't fail if it's not available
+const initPostgres = async () => {
+  try {
+    const postgresModule = await import('@vercel/postgres');
+    sql = postgresModule.sql;
+    console.log('✅ Postgres connection available');
+    return true;
+  } catch (error) {
+    console.warn('⚠️ Postgres not available, using local storage only:', error.message);
+    sql = null;
+    return false;
+  }
+};
+
 class StorageAdapter {
   constructor(config = {}) {
     this.config = {
@@ -35,6 +49,18 @@ class StorageAdapter {
     
     // Initialize database tables
     this.initDatabase();
+    
+    // Try to initialize Postgres connection
+    this.initPostgresConnection();
+  }
+
+  async initPostgresConnection() {
+    const postgresAvailable = await initPostgres();
+    if (postgresAvailable) {
+      this.config.enablePersistence = true;
+    } else {
+      this.config.enablePersistence = false;
+    }
   }
 
   async initDatabase() {
@@ -270,6 +296,11 @@ class StorageAdapter {
 
   // Persistence layer methods
   async getFromPersistence(key) {
+    // If Postgres is not available, return null
+    if (!sql || !this.config.enablePersistence) {
+      return null;
+    }
+    
     try {
       if (key.startsWith('user:')) {
         const userId = key.replace('user:', '');
@@ -311,6 +342,11 @@ class StorageAdapter {
   }
 
   async setToPersistence(key, value) {
+    // If Postgres is not available, skip persistence
+    if (!sql || !this.config.enablePersistence) {
+      return;
+    }
+    
     try {
       if (key.startsWith('user:')) {
         const userId = key.replace('user:', '');
@@ -377,6 +413,11 @@ class StorageAdapter {
   }
 
   async delFromPersistence(key) {
+    // If Postgres is not available, skip persistence
+    if (!sql || !this.config.enablePersistence) {
+      return;
+    }
+    
     try {
       if (key.startsWith('user:')) {
         const userId = key.replace('user:', '');
