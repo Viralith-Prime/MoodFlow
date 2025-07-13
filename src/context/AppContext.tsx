@@ -1,6 +1,5 @@
 import React, { useReducer, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import type { AppState, MoodEntry, UserSettings, NavigationTab, AuthState, User } from '../types';
 import { apiService } from '../services/api';
 import { authService } from '../services/authService';
@@ -134,115 +133,26 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   });
 
-  // Load data from API
+  // Simplified data loading - just load defaults for now
   useEffect(() => {
-    const loadInitialData = async () => {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      
-      try {
-        // Try to load from API
-        const [moodsResponse, settingsResponse] = await Promise.all([
-          apiService.getMoods(),
-          apiService.getSettings()
-        ]);
-
-        const moods = moodsResponse.success && moodsResponse.moods 
-          ? moodsResponse.moods.map((mood: any) => ({
-              ...mood,
-              timestamp: new Date(mood.timestamp),
-            }))
-          : [];
-
-        const settings = settingsResponse.success && settingsResponse.settings
-          ? { ...defaultSettings, ...settingsResponse.settings }
-          : defaultSettings;
-
-        dispatch({ type: 'LOAD_DATA', payload: { moods, settings } });
-      } catch (error) {
-        console.error('Error loading data:', error);
-        // Load with defaults if API fails
-        dispatch({ type: 'LOAD_DATA', payload: { moods: [], settings: defaultSettings } });
-      }
-    };
-
-    loadInitialData();
+    console.log('AppProvider initialized');
+    dispatch({ type: 'LOAD_DATA', payload: { moods: [], settings: defaultSettings } });
   }, []);
 
-  // Update sync status periodically
-  useEffect(() => {
-    const updateSyncStatus = () => {
-      dispatch({
-        type: 'UPDATE_SYNC_STATUS',
-        payload: {
-          isOffline: !navigator.onLine,
-          pendingSyncCount: 0, // Simplified - no sync queue
-          lastSyncTime: state.syncStatus?.lastSyncTime
-        }
-      });
-    };
-
-    updateSyncStatus();
-    const interval = setInterval(updateSyncStatus, 10000); // Update every 10 seconds
-    
-    return () => clearInterval(interval);
-  }, [state.syncStatus?.lastSyncTime]);
-
   const addMood = async (moodData: Omit<MoodEntry, 'id' | 'timestamp'>) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    
-    try {
-      const response = await apiService.addMood(moodData);
-      
-      if (response.success && response.mood) {
-        const newMood: MoodEntry = {
-          ...response.mood,
-          timestamp: new Date(response.mood.timestamp),
-        };
-        dispatch({ type: 'ADD_MOOD', payload: newMood });
-        
-        // Update sync status
-        dispatch({
-          type: 'UPDATE_SYNC_STATUS',
-          payload: {
-            isOffline: !navigator.onLine,
-            pendingSyncCount: 0,
-            lastSyncTime: new Date()
-          }
-        });
-      } else {
-        dispatch({ type: 'SET_ERROR', payload: response.error || 'Failed to add mood' });
-      }
-    } catch (error) {
-      console.error('Error adding mood:', error);
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to add mood' });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
+    console.log('Adding mood:', moodData);
+    // For now, just add to local state
+    const newMood: MoodEntry = {
+      id: crypto.randomUUID(),
+      ...moodData,
+      timestamp: new Date(),
+    };
+    dispatch({ type: 'ADD_MOOD', payload: newMood });
   };
 
   const updateSettings = async (settings: Partial<UserSettings>) => {
-    try {
-      const response = await apiService.updateSettings(settings);
-      
-      if (response.success && response.settings) {
-        dispatch({ type: 'UPDATE_SETTINGS', payload: response.settings });
-        
-        // Update sync status
-        dispatch({
-          type: 'UPDATE_SYNC_STATUS',
-          payload: {
-            isOffline: !navigator.onLine,
-            pendingSyncCount: 0,
-            lastSyncTime: new Date()
-          }
-        });
-      } else {
-        dispatch({ type: 'SET_ERROR', payload: response.error || 'Failed to update settings' });
-      }
-    } catch (error) {
-      console.error('Error updating settings:', error);
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to update settings' });
-    }
+    console.log('Updating settings:', settings);
+    dispatch({ type: 'UPDATE_SETTINGS', payload: settings });
   };
 
   const setCurrentTab = (tab: NavigationTab) => {
@@ -261,47 +171,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   const forceSync = async (): Promise<void> => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      
-      // Reload data from API
-      const [moodsResponse, settingsResponse] = await Promise.all([
-        apiService.getMoods(),
-        apiService.getSettings()
-      ]);
-
-      if (moodsResponse.success && settingsResponse.success) {
-        const moods = moodsResponse.moods 
-          ? moodsResponse.moods.map((mood: any) => ({
-              ...mood,
-              timestamp: new Date(mood.timestamp),
-            }))
-          : [];
-
-        const settings = settingsResponse.settings
-          ? { ...defaultSettings, ...settingsResponse.settings }
-          : defaultSettings;
-
-        dispatch({
-          type: 'LOAD_DATA',
-          payload: { moods, settings }
-        });
-        
-        dispatch({
-          type: 'UPDATE_SYNC_STATUS',
-          payload: {
-            isOffline: !navigator.onLine,
-            pendingSyncCount: 0,
-            lastSyncTime: new Date()
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error during force sync:', error);
-      dispatch({ type: 'SET_ERROR', payload: 'Sync failed - please try again' });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
+    console.log('Force sync called');
+    // For now, just log
   };
 
   const setAuthState = (authState: AuthState) => {
