@@ -1,5 +1,6 @@
 import { storageAdapter } from '../storage/StorageAdapter.js';
 import { authEngine } from '../auth/CustomAuthEngine.js';
+import { jwtVerify } from 'jose';
 import { z } from 'zod';
 
 // Comprehensive error handling wrapper
@@ -71,7 +72,7 @@ async function getUserFromToken(request) {
 
     while (retryCount < maxRetries) {
       try {
-        user = await storage.get(`user:${payload.userId}`);
+        user = await storageAdapter.get(`user:${payload.userId}`);
         break;
       } catch (error) {
         retryCount++;
@@ -156,7 +157,7 @@ const handler = async (req, res) => {
 
       while (retryCount < maxRetries) {
         try {
-          userMoods = await storage.get(`moods:${user.id}`) || [];
+          userMoods = await storageAdapter.get(`moods:${user.id}`) || [];
           break;
         } catch (error) {
           retryCount++;
@@ -261,7 +262,7 @@ const handler = async (req, res) => {
       retryCount = 0;
       while (retryCount < maxRetries) {
         try {
-          await storage.set(`moods:${user.id}`, userMoods);
+          await storageAdapter.set(`moods:${user.id}`, userMoods);
           break;
         } catch (error) {
           retryCount++;
@@ -310,7 +311,7 @@ const handler = async (req, res) => {
 
       while (retryCount < maxRetries) {
         try {
-          userMoods = await storage.get(`moods:${user.id}`) || [];
+          userMoods = await storageAdapter.get(`moods:${user.id}`) || [];
           break;
         } catch (error) {
           retryCount++;
@@ -339,7 +340,7 @@ const handler = async (req, res) => {
       retryCount = 0;
       while (retryCount < maxRetries) {
         try {
-          await storage.set(`moods:${user.id}`, userMoods);
+          await storageAdapter.set(`moods:${user.id}`, userMoods);
           break;
         } catch (error) {
           retryCount++;
@@ -372,7 +373,7 @@ const handler = async (req, res) => {
 
       while (retryCount < maxRetries) {
         try {
-          userMoods = await storage.get(`moods:${user.id}`) || [];
+          userMoods = await storageAdapter.get(`moods:${user.id}`) || [];
           break;
         } catch (error) {
           retryCount++;
@@ -396,7 +397,7 @@ const handler = async (req, res) => {
       retryCount = 0;
       while (retryCount < maxRetries) {
         try {
-          await storage.set(`moods:${user.id}`, userMoods);
+          await storageAdapter.set(`moods:${user.id}`, userMoods);
           break;
         } catch (error) {
           retryCount++;

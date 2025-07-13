@@ -1,5 +1,6 @@
 import { storageAdapter } from '../storage/StorageAdapter.js';
 import { authEngine } from '../auth/CustomAuthEngine.js';
+import { jwtVerify } from 'jose';
 import { z } from 'zod';
 
 const withErrorHandling = (handler) => async (req, res) => {
@@ -39,7 +40,7 @@ async function getUserFromToken(req) {
     if (!payload || !payload.userId) {
       return null;
     }
-    const user = await storage.get(`user:${payload.userId}`);
+    const user = await storageAdapter.get(`user:${payload.userId}`);
     return user;
   } catch (error) {
     return null;
